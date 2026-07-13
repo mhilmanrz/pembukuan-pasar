@@ -1,0 +1,64 @@
+# =============================================
+# CI/CD Pipeline - Pembukuan Semangka
+# Deploy Frontend ke Netlify & Backend ke Railway
+# Trigger: push ke branch main
+# =============================================
+
+name: 🍉 Deploy Pembukuan Semangka
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # ==========================================
+  # Job 1: Deploy Backend ke Railway
+  # ==========================================
+  deploy-backend:
+    name: 🚂 Deploy Backend to Railway
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --service ${{ secrets.RAILWAY_SERVICE_NAME }} --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ==========================================
+  # Job 2: Deploy Frontend ke Netlify
+  # ==========================================
+  deploy-frontend:
+    name: 🌐 Deploy Frontend to Netlify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: frontend/dist
+          production-deploy: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
