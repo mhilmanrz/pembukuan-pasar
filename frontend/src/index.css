@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  --color-watermelon-50: #fef2f2;
+  --color-watermelon-100: #fee2e2;
+  --color-watermelon-200: #fecaca;
+  --color-watermelon-300: #fca5a5;
+  --color-watermelon-400: #f87171;
+  --color-watermelon-500: #ef4444;
+  --color-watermelon-600: #dc2626;
+  --color-watermelon-700: #b91c1c;
+  --color-watermelon-800: #991b1b;
+  --color-watermelon-900: #7f1d1d;
+
+  --color-melon-50: #f0fdf4;
+  --color-melon-100: #dcfce7;
+  --color-melon-200: #bbf7d0;
+  --color-melon-300: #86efac;
+  --color-melon-400: #4ade80;
+  --color-melon-500: #22c55e;
+  --color-melon-600: #16a34a;
+  --color-melon-700: #15803d;
+  --color-melon-800: #166534;
+  --color-melon-900: #14532d;
+
+  --color-surface: #0f172a;
+  --color-surface-card: #1e293b;
+  --color-surface-elevated: #334155;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-border: #334155;
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    min-height: 100dvh;
+  }
+
+  input, select, textarea {
+    color-scheme: dark;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 999px;
+}
+
+/* Animations */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+@keyframes slide-down {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-down {
+  animation: slide-down 0.15s ease-out;
+}
+
+/* Safe area for bottom nav */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
