@@ -1,4 +1,4 @@
-# 🍉 Pembukuan Semangka (v1.0.0)
+# 🍉 Pembukuan Pasar (v1.0.0)
 
 Aplikasi web pembukuan operasional bisnis penjualan semangka tingkat grosir/pasar. Dirancang dengan pendekatan *mobile-first* (nyaman dibuka di HP) untuk mempermudah pemilik usaha mengelola stok, penjualan, serta pencatatan hutang/piutang secara *real-time* dan akurat.
 
@@ -90,4 +90,4 @@ Aplikasi ini membutuhkan file `.env` untuk berjalan.
 | `VITE_API_URL` | URL dari backend API (contoh saat live: `https://app-backend.railway.app/api`) |
 
 ---
-*Dibuat untuk mempermudah operasional pasar. 🍉*
+*Dibuat untuk mempermudah operasional pasar.*
