@@ -83,6 +83,15 @@ const getLaporan = async (req, res) => {
       dari && sampai ? [dari, sampai] : dari ? [dari] : sampai ? [sampai] : []
     );
 
+    // Total pembayaran terkait barang masuk (cicilan modal)
+    const pembayaranBM = await pool.query(
+      `SELECT COALESCE(SUM(pbm.jumlah_bayar), 0) AS total 
+       FROM pembayaran_barang_masuk pbm 
+       JOIN barang_masuk bm ON pbm.barang_masuk_id = bm.id 
+       ${dari && sampai ? ' WHERE bm.tanggal BETWEEN $1 AND $2' : dari ? ' WHERE bm.tanggal >= $1' : sampai ? ' WHERE bm.tanggal <= $1' : ''}`,
+      dari && sampai ? [dari, sampai] : dari ? [dari] : sampai ? [sampai] : []
+    );
+
     const kgBarangMasuk = parseFloat(totalBarangMasuk.rows[0].total);
     const totalHargaBarangMasuk = parseFloat(totalBarangMasuk.rows[0].total_harga);
     const kgHutang = parseFloat(hutangData.rows[0].total_kg);
@@ -93,6 +102,7 @@ const getLaporan = async (req, res) => {
     const jumlahHutang = parseFloat(hutangData.rows[0].total_jumlah);
     const dibayarPiutang = parseFloat(pembayaranPiutang.rows[0].total);
     const dibayarHutang = parseFloat(pembayaranHutang.rows[0].total);
+    const dibayarBM = parseFloat(pembayaranBM.rows[0].total);
 
     // Formulas from spec
     const sisaStok = (kgBarangMasuk + kgHutang) - (kgTerjual + kgPiutang);
@@ -101,7 +111,7 @@ const getLaporan = async (req, res) => {
     const keuntungan = omzet - modal;
     const kasDiterima = uangPenjualan + dibayarPiutang;
     const piutangBelumTertagih = jumlahPiutang - dibayarPiutang;
-    const hutangBelumDibayar = jumlahHutang - dibayarHutang;
+    const hutangBelumDibayar = (jumlahHutang - dibayarHutang) + (totalHargaBarangMasuk - dibayarBM);
 
     res.json({
       sisa_stok_kg: sisaStok,
@@ -122,6 +132,8 @@ const getLaporan = async (req, res) => {
         total_jumlah_hutang: jumlahHutang,
         total_dibayar_piutang: dibayarPiutang,
         total_dibayar_hutang: dibayarHutang,
+        total_dibayar_barang_masuk: dibayarBM,
+        total_harga_barang_masuk: totalHargaBarangMasuk,
       },
     });
   } catch (err) {

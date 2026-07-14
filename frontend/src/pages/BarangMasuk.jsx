@@ -143,8 +143,10 @@ export default function BarangMasuk() {
       (acc, item) => ({
         kg: acc.kg + (parseFloat(item.kg) || 0),
         harga: acc.harga + (parseFloat(item.harga) || 0),
+        dibayar: acc.dibayar + (parseFloat(item.total_dibayar) || 0),
+        sisa: acc.sisa + (parseFloat(item.sisa_bayar) || 0),
       }),
-      { kg: 0, harga: 0 }
+      { kg: 0, harga: 0, dibayar: 0, sisa: 0 }
     );
   }, [filteredItems]);
 
@@ -385,11 +387,22 @@ export default function BarangMasuk() {
         <div className="mb-6 space-y-3">
           {/* Grand total */}
           <div className="bg-gradient-to-br from-melon-600 to-melon-800 rounded-2xl p-4 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
                 <p className="text-xs text-white/60 font-medium">Total ({filteredItems.length} transaksi)</p>
                 <p className="text-lg font-bold text-white">{formatRupiah(grandTotal.harga)}</p>
-                <p className="text-sm text-white/70">{formatKg(grandTotal.kg)}</p>
+                <p className="text-xs text-white/80">{formatKg(grandTotal.kg)}</p>
+                
+                <div className="flex gap-4 pt-2 border-t border-white/20 mt-2">
+                  <div>
+                    <span className="text-[10px] text-white/60 block">Sudah Dibayar</span>
+                    <span className="text-xs font-semibold text-white">✓ {formatRupiah(grandTotal.dibayar)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-white/60 block">Belum Dibayar</span>
+                    <span className="text-xs font-semibold text-white">⏳ {formatRupiah(grandTotal.sisa)}</span>
+                  </div>
+                </div>
               </div>
               <span className="text-3xl opacity-80">📦</span>
             </div>
