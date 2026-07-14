@@ -2,8 +2,6 @@
 
 Aplikasi web pembukuan operasional bisnis penjualan semangka tingkat grosir/pasar. Dirancang dengan pendekatan *mobile-first* (nyaman dibuka di HP) untuk mempermudah pemilik usaha mengelola stok, penjualan, serta pencatatan hutang/piutang secara *real-time* dan akurat.
 
-![Dashboard Preview](https://via.placeholder.com/800x400.png?text=Pembukuan+Semangka+Dashboard) *(Ilustrasi Dashboard)*
-
 ## ✨ Fitur Unggulan
 
 Aplikasi ini telah mencapai versi stabil pertama dengan fitur lengkap:
@@ -82,4 +80,4 @@ Aplikasi ini membutuhkan file `.env` untuk berjalan.
 | `VITE_API_URL` | URL dari backend API (contoh saat live: `https://app-backend.railway.app/api`) |
 
 ---
-*Dibuat untuk mempermudah operasional pasar. 🍉*
+*Dibuat untuk mempermudah operasional pasar.*
