@@ -1,6 +1,25 @@
 import { useState, useEffect } from 'react';
 import { getHutangPiutang, createHutangPiutang, updateHutangPiutang, deleteHutangPiutang, getPembayaranByHP, createPembayaran } from '../services/api';
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
+
+// Helper to get date range params from filter
+function getDateParams(filter) {
+  const now = new Date();
+  const today = todayStr();
+  switch (filter) {
+    case 'hari-ini':
+      return { dari: today, sampai: today };
+    case 'minggu-ini': {
+      const start = new Date(now);
+      start.setDate(now.getDate() - now.getDay());
+      return { dari: start.toISOString().split('T')[0], sampai: today };
+    }
+    case 'bulan-ini':
+      return { dari: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, sampai: today };
+    default:
+      return {};
+  }
+}
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
 import CurrencyInput from '../components/CurrencyInput';
@@ -14,6 +33,7 @@ export default function HutangPiutang() {
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({ tipe: 'piutang', tanggal: todayStr(), nama: '', kg: '', jumlah_total: '', keterangan: '' });
   const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState('bulan-ini');
 
   // Pembayaran state
   const [showBayar, setShowBayar] = useState(false);
@@ -22,12 +42,12 @@ export default function HutangPiutang() {
   const [bayarForm, setBayarForm] = useState({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
   const [savingBayar, setSavingBayar] = useState(false);
 
-  useEffect(() => { fetchData(); }, [tipeFilter]);
+  useEffect(() => { fetchData(); }, [tipeFilter, filter]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { ...getDateParams(filter) };
       if (tipeFilter) params.tipe = tipeFilter;
       const res = await getHutangPiutang(params);
       setItems(res.data);
@@ -138,7 +158,7 @@ export default function HutangPiutang() {
       />
 
       {/* Type filter */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-3">
         {[
           { val: '', label: 'Semua' },
           { val: 'piutang', label: '📤 Piutang' },
@@ -150,6 +170,28 @@ export default function HutangPiutang() {
                 ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25'
                 : 'bg-surface-card text-text-secondary hover:bg-surface-elevated'
             }`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Date filter */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-1 px-1">
+        {[
+          { val: 'bulan-ini', label: 'Bulan Ini' },
+          { val: 'minggu-ini', label: 'Minggu Ini' },
+          { val: 'hari-ini', label: 'Hari Ini' },
+          { val: 'semua', label: 'Semua' },
+        ].map((f) => (
+          <button
+            key={f.val}
+            onClick={() => setFilter(f.val)}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+              filter === f.val
+                ? 'bg-amber-500/80 text-white shadow-lg shadow-amber-500/20'
+                : 'bg-surface-card text-text-secondary hover:bg-surface-elevated'
+            }`}
+          >
             {f.label}
           </button>
         ))}

@@ -1,10 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getPenjualan, createPenjualan, updatePenjualan, deletePenjualan } from '../services/api';
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
 import CurrencyInput from '../components/CurrencyInput';
 import NumberInput from '../components/NumberInput';
+
+// Helper to get date range params from filter
+function getDateParams(filter) {
+  const now = new Date();
+  const today = todayStr();
+  switch (filter) {
+    case 'hari-ini':
+      return { dari: today, sampai: today };
+    case 'minggu-ini': {
+      const start = new Date(now);
+      start.setDate(now.getDate() - now.getDay());
+      return { dari: start.toISOString().split('T')[0], sampai: today };
+    }
+    case 'bulan-ini':
+      return { dari: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, sampai: today };
+    default:
+      return {};
+  }
+}
 
 export default function Penjualan() {
   const [items, setItems] = useState([]);
@@ -13,13 +32,15 @@ export default function Penjualan() {
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({ tanggal: todayStr(), sesi: 'siang', kg_terjual: '', total_uang: '' });
   const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState('bulan-ini');
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [filter]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await getPenjualan();
+      const params = getDateParams(filter);
+      const res = await getPenjualan(params);
       setItems(res.data);
     } catch (err) {
       console.error('Gagal memuat data:', err);
@@ -27,6 +48,18 @@ export default function Penjualan() {
       setLoading(false);
     }
   };
+
+  // Summary totals
+  const summary = useMemo(() => {
+    return items.reduce(
+      (acc, item) => ({
+        totalUang: acc.totalUang + (parseFloat(item.total_uang) || 0),
+        totalKg: acc.totalKg + (parseFloat(item.kg_terjual) || 0),
+        count: acc.count + 1,
+      }),
+      { totalUang: 0, totalKg: 0, count: 0 }
+    );
+  }, [items]);
 
   const openCreate = () => {
     setEditItem(null);
@@ -73,6 +106,8 @@ export default function Penjualan() {
     }
   };
 
+  const filterLabel = { 'bulan-ini': 'Bulan Ini', 'minggu-ini': 'Minggu Ini', 'hari-ini': 'Hari Ini', 'semua': 'Semua' };
+
   return (
     <div>
       <PageHeader
@@ -85,6 +120,52 @@ export default function Penjualan() {
           </button>
         }
       />
+
+      {/* Date Filter */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-2 -mx-1 px-1">
+        {[
+          { val: 'bulan-ini', label: 'Bulan Ini' },
+          { val: 'minggu-ini', label: 'Minggu Ini' },
+          { val: 'hari-ini', label: 'Hari Ini' },
+          { val: 'semua', label: 'Semua' },
+        ].map((f) => (
+          <button
+            key={f.val}
+            onClick={() => setFilter(f.val)}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+              filter === f.val
+                ? 'bg-watermelon-500 text-white shadow-lg shadow-watermelon-500/25'
+                : 'bg-surface-card text-text-secondary hover:bg-surface-elevated'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Summary Cards */}
+      {!loading && items.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-gradient-to-br from-watermelon-600 to-watermelon-800 rounded-2xl p-4 shadow-lg col-span-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-white/60 font-medium">Total Penjualan — {filterLabel[filter]}</p>
+                <p className="text-xl font-bold text-white mt-0.5">{formatRupiah(summary.totalUang)}</p>
+                <p className="text-xs text-white/70 mt-0.5">{summary.count} transaksi</p>
+              </div>
+              <span className="text-3xl opacity-80">💰</span>
+            </div>
+          </div>
+          <div className="bg-surface-card border border-border rounded-2xl p-4">
+            <p className="text-[10px] text-text-muted font-medium mb-1">Total Kg Terjual</p>
+            <p className="text-base font-bold text-melon-500">{formatKg(summary.totalKg)}</p>
+          </div>
+          <div className="bg-surface-card border border-border rounded-2xl p-4">
+            <p className="text-[10px] text-text-muted font-medium mb-1">Rata-rata / Transaksi</p>
+            <p className="text-base font-bold text-watermelon-500">{summary.count > 0 ? formatRupiah(summary.totalUang / summary.count) : 'Rp 0'}</p>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">

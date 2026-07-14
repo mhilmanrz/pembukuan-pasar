@@ -55,8 +55,11 @@ export default function BarangMasuk() {
 
   // Filters
   const [filterPengirim, setFilterPengirim] = useState('semua');
-  const [filterPeriode, setFilterPeriode] = useState('semua'); // semua, bulan, minggu
-  const [filterBulan, setFilterBulan] = useState('');
+  const [filterPeriode, setFilterPeriode] = useState('bulan'); // semua, bulan, minggu
+  const [filterBulan, setFilterBulan] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [filterMinggu, setFilterMinggu] = useState('');
 
   useEffect(() => {
@@ -320,9 +323,9 @@ export default function BarangMasuk() {
           <label className="text-xs text-text-muted mb-1.5 block font-medium">Periode</label>
           <div className="flex gap-2 items-center">
             {[
-              { val: 'semua', label: 'Semua' },
               { val: 'bulan', label: 'Bulanan' },
               { val: 'minggu', label: 'Mingguan' },
+              { val: 'semua', label: 'Semua' },
             ].map((opt) => (
               <button
                 key={opt.val}

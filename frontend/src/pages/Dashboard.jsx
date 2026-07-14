@@ -51,7 +51,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('semua');
+  const [filter, setFilter] = useState('bulan-ini');
   const [dari, setDari] = useState('');
   const [sampai, setSampai] = useState(todayStr());
 
@@ -116,10 +116,10 @@ export default function Dashboard() {
       {/* Filter */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-1 px-1">
         {[
-          { val: 'semua', label: 'Semua' },
-          { val: 'hari-ini', label: 'Hari Ini' },
-          { val: 'minggu-ini', label: 'Minggu Ini' },
           { val: 'bulan-ini', label: 'Bulan Ini' },
+          { val: 'minggu-ini', label: 'Minggu Ini' },
+          { val: 'hari-ini', label: 'Hari Ini' },
+          { val: 'semua', label: 'Semua' },
           { val: 'custom', label: 'Custom' },
         ].map((f) => (
           <button
