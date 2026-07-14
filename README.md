@@ -2,7 +2,7 @@
 
 Aplikasi web pembukuan operasional bisnis penjualan semangka tingkat grosir/pasar. Dirancang dengan pendekatan *mobile-first* (nyaman dibuka di HP) untuk mempermudah pemilik usaha mengelola stok, penjualan, serta pencatatan hutang/piutang secara *real-time* dan akurat.
 
-![Dashboard Preview](./docs/screenshots/dashboard.png)
+                                                 ![Dashboard Preview](./docs/screenshots/dashboard.png)
 
 ## ✨ Fitur Unggulan
 
@@ -13,15 +13,15 @@ Aplikasi ini telah mencapai versi stabil pertama dengan fitur lengkap:
 - 📦 **Manajemen Barang Masuk (Restock)**
   Catat penerimaan barang beserta harga modal. Dilengkapi fitur **unggah foto nota/barang** (otomatis di-compress maksimal 500KB) dan sistem pembayaran bertahap (cicilan/sisa tagihan) kepada pengirim dengan logika FIFO (*First In First Out*).
   <br>
-  ![Barang Masuk Preview](./docs/screenshots/barang_masuk.png)
+                                                ![Barang Masuk Preview](./docs/screenshots/barang_masuk.png)
 - 💰 **Pencatatan Penjualan Harian**
   Catat rekap penjualan harian dengan pembagian shift/sesi (Siang/Malam), lengkap dengan total Kg terjual dan uang masuk.
   <br>
-  ![Penjualan Preview](./docs/screenshots/penjualan.png)
+                                                  ![Penjualan Preview](./docs/screenshots/penjualan.png)
 - 📋 **Buku Hutang & Piutang**
   Lacak dengan mudah siapa yang belum bayar (piutang) dan tagihan yang belum dilunasi (hutang), lengkap dengan riwayat cicilan pembayarannya. Total hutang barang masuk otomatis sinkron ke halaman ini.
   <br>
-  ![Hutang Piutang Preview](./docs/screenshots/hutang_piutang.png)
+                                                  ![Hutang Piutang Preview](./docs/screenshots/hutang_piutang.png)
 
 
 - 🗑️ **Sistem Keamanan Data (Soft Delete)**
