@@ -9,6 +9,8 @@ const laporanController = require('../controllers/laporanController');
 // Barang Masuk
 router.get('/barang-masuk', barangMasukController.getAll);
 router.get('/barang-masuk/pengirim', barangMasukController.getPengirimList);
+router.get('/barang-masuk/pengirim/:nama/bayar', barangMasukController.getPembayaranPengirim);
+router.post('/barang-masuk/pengirim/:nama/bayar', barangMasukController.addPembayaranPengirim);
 router.post('/barang-masuk', barangMasukController.create);
 router.get('/barang-masuk/:id/bayar', barangMasukController.getPembayaran);
 router.post('/barang-masuk/:id/bayar', barangMasukController.addPembayaran);

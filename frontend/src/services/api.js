@@ -11,8 +11,10 @@ export const getPengirimList = () => api.get('/barang-masuk/pengirim');
 export const createBarangMasuk = (data) => api.post('/barang-masuk', data);
 export const updateBarangMasuk = (id, data) => api.put(`/barang-masuk/${id}`, data);
 export const deleteBarangMasuk = (id) => api.delete(`/barang-masuk/${id}`);
-export const getPembayaranBM = (barangMasukId) => api.get(`/barang-masuk/${barangMasukId}/bayar`);
-export const addPembayaranBM = (barangMasukId, data) => api.post(`/barang-masuk/${barangMasukId}/bayar`, data);
+export const getPembayaranBM = (id) => api.get(`/barang-masuk/${id}/bayar`);
+export const addPembayaranBM = (id, data) => api.post(`/barang-masuk/${id}/bayar`, data);
+export const getPembayaranPengirim = (nama) => api.get(`/barang-masuk/pengirim/${encodeURIComponent(nama)}/bayar`);
+export const addPembayaranPengirim = (nama, data) => api.post(`/barang-masuk/pengirim/${encodeURIComponent(nama)}/bayar`, data);
 
 // Penjualan
 export const getPenjualan = (params) => api.get('/penjualan', { params });

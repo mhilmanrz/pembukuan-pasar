@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getBarangMasuk, createBarangMasuk, updateBarangMasuk, deleteBarangMasuk, getPengirimList, getPembayaranBM, addPembayaranBM } from '../services/api';
+import { getBarangMasuk, createBarangMasuk, updateBarangMasuk, deleteBarangMasuk, getPengirimList, getPembayaranPengirim, addPembayaranPengirim } from '../services/api';
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
+import { compressImage } from '../utils/imageCompressor';
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
@@ -39,9 +40,11 @@ export default function BarangMasuk() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  const [form, setForm] = useState({ tanggal: todayStr(), kg: '', nama_pengirim: '', harga: '', sudah_dibayar: '' });
+  const [form, setForm] = useState({ tanggal: todayStr(), kg: '', nama_pengirim: '', harga: '', sudah_dibayar: '', gambar: [] });
   const [saving, setSaving] = useState(false);
   const [pengirimList, setPengirimList] = useState([]);
+  const [compressing, setCompressing] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   // Payment modal state
   const [showBayar, setShowBayar] = useState(false);
@@ -147,7 +150,7 @@ export default function BarangMasuk() {
 
   const openCreate = () => {
     setEditItem(null);
-    setForm({ tanggal: todayStr(), kg: '', nama_pengirim: '', harga: '', sudah_dibayar: '' });
+    setForm({ tanggal: todayStr(), kg: '', nama_pengirim: '', harga: '', sudah_dibayar: '', gambar: [] });
     setShowForm(true);
   };
 
@@ -158,8 +161,42 @@ export default function BarangMasuk() {
       kg: item.kg,
       nama_pengirim: item.nama_pengirim,
       harga: item.harga,
+      gambar: item.gambar || [],
     });
     setShowForm(true);
+  };
+
+  const handleImageChange = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    if ((form.gambar || []).length + files.length > 5) {
+      alert('Maksimal hanya boleh 5 gambar');
+      return;
+    }
+
+    setCompressing(true);
+    const newImages = [...(form.gambar || [])];
+
+    for (const file of files) {
+      try {
+        const compressed = await compressImage(file);
+        newImages.push(compressed);
+      } catch (err) {
+        alert(err.message || 'Gagal memproses gambar');
+      }
+    }
+
+    setForm(prev => ({ ...prev, gambar: newImages }));
+    setCompressing(false);
+    e.target.value = ''; // Reset input file
+  };
+
+  const removeImage = (index) => {
+    setForm(prev => ({
+      ...prev,
+      gambar: (prev.gambar || []).filter((_, i) => i !== index)
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -192,12 +229,12 @@ export default function BarangMasuk() {
   };
 
   // Payment modal handlers
-  const openBayar = async (item) => {
-    setSelectedBM(item);
+  const openBayar = async (nama_pengirim) => {
+    setSelectedBM(nama_pengirim);
     setShowBayar(true);
     setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
     try {
-      const res = await getPembayaranBM(item.id);
+      const res = await getPembayaranPengirim(nama_pengirim);
       setBayarData(res.data);
     } catch (err) {
       console.error('Gagal memuat riwayat bayar:', err);
@@ -208,8 +245,8 @@ export default function BarangMasuk() {
     e.preventDefault();
     setSavingBayar(true);
     try {
-      await addPembayaranBM(selectedBM.id, bayarForm);
-      const res = await getPembayaranBM(selectedBM.id);
+      await addPembayaranPengirim(selectedBM, bayarForm);
+      const res = await getPembayaranPengirim(selectedBM);
       setBayarData(res.data);
       setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
       fetchData();
@@ -375,7 +412,10 @@ export default function BarangMasuk() {
                           <p className="text-sm font-semibold text-text-primary">{p.nama}</p>
                           <p className="text-xs text-text-muted">{p.count}x · {formatKg(p.totalKg)}</p>
                         </div>
-                        <p className="text-sm font-bold text-text-primary">{formatRupiah(p.totalHarga)}</p>
+                        <div className="flex items-center gap-3">
+                          <p className="text-sm font-bold text-text-primary">{formatRupiah(p.totalHarga)}</p>
+                          <button onClick={() => openBayar(p.nama)} className="p-2 -mr-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar Tagihan">💳</button>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3 mt-1.5">
                         <span className="text-xs text-melon-400">✓ {formatRupiah(p.totalDibayar)}</span>
@@ -423,7 +463,7 @@ export default function BarangMasuk() {
             return (
               <div key={item.id} className={`bg-surface-card rounded-2xl p-4 border transition-colors ${lunas ? 'border-melon-500/30' : 'border-border hover:border-amber-500/30'}`}>
                 <div className="flex items-start justify-between">
-                  <div className="flex-1" onClick={() => openBayar(item)} role="button">
+                  <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-semibold text-text-primary">{item.nama_pengirim}</span>
                       {lunas && <span className="text-xs bg-melon-500/15 text-melon-400 px-2 py-0.5 rounded-full font-bold">✓ Lunas</span>}
@@ -441,9 +481,17 @@ export default function BarangMasuk() {
                         {!lunas && <span className="text-xs text-amber-400">Sisa: {formatRupiah(sisa)}</span>}
                       </div>
                     )}
+                    {item.gambar && item.gambar.length > 0 && (
+                      <div className="flex gap-2 mt-3 overflow-x-auto pb-1 -mx-1 px-1">
+                        {item.gambar.map((img, idx) => (
+                          <div key={idx} className="relative w-14 h-14 rounded-lg overflow-hidden border border-border/60 flex-shrink-0 cursor-pointer hover:opacity-90 active:scale-95 transition-all" onClick={() => setPreviewImage(img)}>
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-1">
-                    <button onClick={() => openBayar(item)} className="p-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar">💳</button>
                     <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors">✏️</button>
                     <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg hover:bg-watermelon-500/10 text-text-muted hover:text-watermelon-400 transition-colors">🗑️</button>
                   </div>
@@ -489,6 +537,44 @@ export default function BarangMasuk() {
                 placeholder="0 jika belum bayar" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" />
             </div>
           )}
+          <div>
+            <label className="text-sm text-text-secondary mb-1.5 block font-medium">Foto Barang (Maks 5)</label>
+            <div className="grid grid-cols-5 gap-2 mb-2">
+              {form.gambar && form.gambar.map((img, idx) => (
+                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-border bg-surface-elevated">
+                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(idx)}
+                    className="absolute top-1 right-1 bg-black/75 hover:bg-watermelon-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs transition-colors"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+              {(!form.gambar || form.gambar.length < 5) && (
+                <label className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-surface-elevated hover:border-melon-500 transition-colors">
+                  {compressing ? (
+                    <span className="text-[10px] text-text-muted animate-pulse text-center px-1">Membaca...</span>
+                  ) : (
+                    <>
+                      <span className="text-lg">📸</span>
+                      <span className="text-[10px] text-text-muted mt-0.5">Tambah</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/png, image/jpeg, image/jpg"
+                    onChange={handleImageChange}
+                    className="hidden"
+                    disabled={compressing}
+                  />
+                </label>
+              )}
+            </div>
+            <p className="text-[10px] text-text-muted leading-tight">Format: JPG, PNG. Maks 500KB per gambar (akan otomatis dikompres).</p>
+          </div>
           <button type="submit" disabled={saving}
             className="w-full bg-melon-500 hover:bg-melon-600 disabled:opacity-50 text-white py-3.5 rounded-xl font-semibold transition-all duration-200 active:scale-[0.98]">
             {saving ? 'Menyimpan...' : editItem ? 'Simpan Perubahan' : 'Tambah Barang'}
@@ -498,22 +584,21 @@ export default function BarangMasuk() {
 
       {/* Payment Modal */}
       <Modal isOpen={showBayar} onClose={() => { setShowBayar(false); setSelectedBM(null); setBayarData(null); }}
-        title={selectedBM ? `Pembayaran — ${selectedBM.nama_pengirim}` : 'Pembayaran'}>
+        title={selectedBM ? `Pembayaran — ${selectedBM}` : 'Pembayaran'}>
         {bayarData && (
           <div className="space-y-4">
             {/* Summary */}
             <div className="bg-surface-elevated rounded-xl p-4">
-              <p className="text-xs text-text-muted mb-2">{formatTanggal(bayarData.barang_masuk?.tanggal)} · {formatKg(bayarData.barang_masuk?.kg)}</p>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-text-muted">Harga Total</span>
-                <span className="text-text-primary font-medium">{formatRupiah(bayarData.barang_masuk?.harga)}</span>
+                <span className="text-text-muted">Total Tagihan</span>
+                <span className="text-text-primary font-medium">{formatRupiah(bayarData.total_harga)}</span>
               </div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-text-muted">Dibayar</span>
+                <span className="text-text-muted">Total Dibayar</span>
                 <span className="text-melon-400 font-medium">{formatRupiah(bayarData.total_dibayar)}</span>
               </div>
               <div className="flex justify-between text-sm font-bold border-t border-border pt-2 mt-2">
-                <span className="text-text-secondary">Sisa</span>
+                <span className="text-text-secondary">Sisa Tagihan</span>
                 <span className={bayarData.sisa <= 0 ? 'text-melon-400' : 'text-amber-400'}>{formatRupiah(bayarData.sisa)}</span>
               </div>
             </div>
@@ -523,8 +608,8 @@ export default function BarangMasuk() {
               <div>
                 <h4 className="text-sm font-semibold text-text-secondary mb-2">Riwayat Cicilan</h4>
                 <div className="space-y-2">
-                  {bayarData.pembayaran.map((p) => (
-                    <div key={p.id} className="flex justify-between items-center bg-surface-card rounded-xl px-4 py-3 border border-border">
+                  {bayarData.pembayaran.map((p, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-surface-card rounded-xl px-4 py-3 border border-border">
                       <span className="text-sm text-text-muted">{formatTanggal(p.tanggal_bayar)}</span>
                       <span className="text-sm text-melon-400 font-medium">{formatRupiah(p.jumlah_bayar)}</span>
                     </div>
@@ -557,6 +642,14 @@ export default function BarangMasuk() {
         )}
         {!bayarData && <div className="py-8 text-center text-text-muted">Memuat data...</div>}
       </Modal>
+
+      {/* Fullscreen Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 cursor-zoom-out" onClick={() => setPreviewImage(null)}>
+          <button className="absolute top-6 right-6 text-white/70 hover:text-white text-3xl font-light p-2 hover:bg-white/10 rounded-full transition-colors leading-none" onClick={() => setPreviewImage(null)}>&times;</button>
+          <img src={previewImage} alt="Preview" className="max-w-full max-h-[90vh] rounded-xl object-contain shadow-2xl border border-white/10 animate-scale-up" />
+        </div>
+      )}
     </div>
   );
 }
