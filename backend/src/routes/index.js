@@ -16,18 +16,21 @@ router.get('/barang-masuk/:id/bayar', barangMasukController.getPembayaran);
 router.post('/barang-masuk/:id/bayar', barangMasukController.addPembayaran);
 router.put('/barang-masuk/:id', barangMasukController.update);
 router.delete('/barang-masuk/:id', barangMasukController.remove);
+router.put('/barang-masuk/:id/restore', barangMasukController.restore);
 
 // Penjualan
 router.get('/penjualan', penjualanController.getAll);
 router.post('/penjualan', penjualanController.create);
 router.put('/penjualan/:id', penjualanController.update);
 router.delete('/penjualan/:id', penjualanController.remove);
+router.put('/penjualan/:id/restore', penjualanController.restore);
 
 // Hutang Piutang
 router.get('/hutang-piutang', hutangPiutangController.getAll);
 router.post('/hutang-piutang', hutangPiutangController.create);
 router.put('/hutang-piutang/:id', hutangPiutangController.update);
 router.delete('/hutang-piutang/:id', hutangPiutangController.remove);
+router.put('/hutang-piutang/:id/restore', hutangPiutangController.restore);
 
 // Pembayaran
 router.post('/pembayaran', pembayaranController.create);

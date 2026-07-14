@@ -3,21 +3,29 @@ const pool = require('../config/db');
 // GET /api/penjualan
 const getAll = async (req, res) => {
   try {
-    const { dari, sampai } = req.query;
-    let query = 'SELECT * FROM penjualan';
+    const { dari, sampai, status } = req.query;
+    let query = 'SELECT * FROM penjualan WHERE ';
+    const conditions = [];
     const params = [];
 
+    if (status === 'deleted') {
+      conditions.push('deleted_at IS NOT NULL');
+    } else {
+      conditions.push('deleted_at IS NULL');
+    }
+
     if (dari && sampai) {
-      query += ' WHERE tanggal BETWEEN $1 AND $2';
+      conditions.push(`tanggal BETWEEN $${params.length + 1} AND $${params.length + 2}`);
       params.push(dari, sampai);
     } else if (dari) {
-      query += ' WHERE tanggal >= $1';
+      conditions.push(`tanggal >= $${params.length + 1}`);
       params.push(dari);
     } else if (sampai) {
-      query += ' WHERE tanggal <= $1';
+      conditions.push(`tanggal <= $${params.length + 1}`);
       params.push(sampai);
     }
 
+    query += conditions.join(' AND ');
     query += ' ORDER BY tanggal DESC, created_at DESC';
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -74,15 +82,30 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('DELETE FROM penjualan WHERE id=$1 RETURNING *', [id]);
+    const result = await pool.query('UPDATE penjualan SET deleted_at = NOW() WHERE id=$1 RETURNING *', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Data tidak ditemukan' });
     }
-    res.json({ message: 'Data berhasil dihapus' });
+    res.json({ message: 'Data berhasil dipindahkan ke tempat sampah' });
   } catch (err) {
     console.error('Error delete penjualan:', err);
     res.status(500).json({ error: 'Gagal menghapus penjualan' });
   }
 };
 
-module.exports = { getAll, create, update, remove };
+// PUT /api/penjualan/:id/restore
+const restore = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('UPDATE penjualan SET deleted_at = NULL WHERE id=$1 RETURNING *', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Data tidak ditemukan' });
+    }
+    res.json({ message: 'Data berhasil dipulihkan' });
+  } catch (err) {
+    console.error('Error restore penjualan:', err);
+    res.status(500).json({ error: 'Gagal memulihkan penjualan' });
+  }
+};
+
+module.exports = { getAll, create, update, remove, restore };

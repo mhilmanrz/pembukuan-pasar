@@ -3,7 +3,7 @@ const pool = require('../config/db');
 // GET /api/barang-masuk
 const getAll = async (req, res) => {
   try {
-    const { dari, sampai } = req.query;
+    const { dari, sampai, status } = req.query;
     let query = `
       SELECT bm.*, 
         COALESCE(SUM(pbm.jumlah_bayar), 0) AS total_dibayar,
@@ -14,6 +14,12 @@ const getAll = async (req, res) => {
     const conditions = [];
     const params = [];
     let paramIndex = 1;
+
+    if (status === 'deleted') {
+      conditions.push('bm.deleted_at IS NOT NULL');
+    } else {
+      conditions.push('bm.deleted_at IS NULL');
+    }
 
     if (dari && sampai) {
       conditions.push(`bm.tanggal BETWEEN $${paramIndex++} AND $${paramIndex++}`);
@@ -111,14 +117,29 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('DELETE FROM barang_masuk WHERE id=$1 RETURNING *', [id]);
+    const result = await pool.query('UPDATE barang_masuk SET deleted_at = NOW() WHERE id=$1 RETURNING *', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Data tidak ditemukan' });
     }
-    res.json({ message: 'Data berhasil dihapus' });
+    res.json({ message: 'Data berhasil dipindahkan ke tempat sampah' });
   } catch (err) {
     console.error('Error delete barang_masuk:', err);
     res.status(500).json({ error: 'Gagal menghapus barang masuk' });
+  }
+};
+
+// PUT /api/barang-masuk/:id/restore
+const restore = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('UPDATE barang_masuk SET deleted_at = NULL WHERE id=$1 RETURNING *', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Data tidak ditemukan' });
+    }
+    res.json({ message: 'Data berhasil dipulihkan' });
+  } catch (err) {
+    console.error('Error restore barang_masuk:', err);
+    res.status(500).json({ error: 'Gagal memulihkan barang masuk' });
   }
 };
 
@@ -126,7 +147,7 @@ const remove = async (req, res) => {
 const getPengirimList = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT DISTINCT nama_pengirim FROM barang_masuk ORDER BY nama_pengirim ASC'
+      'SELECT DISTINCT nama_pengirim FROM barang_masuk WHERE deleted_at IS NULL ORDER BY nama_pengirim ASC'
     );
     res.json(result.rows.map(r => r.nama_pengirim));
   } catch (err) {
@@ -222,7 +243,7 @@ const addPembayaranPengirim = async (req, res) => {
       SELECT bm.id, bm.harga, COALESCE(SUM(pbm.jumlah_bayar), 0) AS total_dibayar
       FROM barang_masuk bm
       LEFT JOIN pembayaran_barang_masuk pbm ON pbm.barang_masuk_id = bm.id
-      WHERE bm.nama_pengirim = $1
+      WHERE bm.nama_pengirim = $1 AND bm.deleted_at IS NULL
       GROUP BY bm.id
       HAVING bm.harga - COALESCE(SUM(pbm.jumlah_bayar), 0) > 0
       ORDER BY bm.tanggal ASC, bm.created_at ASC
@@ -271,10 +292,10 @@ const getPembayaranPengirim = async (req, res) => {
           SELECT COALESCE(SUM(pbm.jumlah_bayar), 0)
           FROM pembayaran_barang_masuk pbm
           JOIN barang_masuk bm2 ON pbm.barang_masuk_id = bm2.id
-          WHERE bm2.nama_pengirim = $1
+          WHERE bm2.nama_pengirim = $1 AND bm2.deleted_at IS NULL
         ) AS total_dibayar
       FROM barang_masuk bm
-      WHERE bm.nama_pengirim = $1
+      WHERE bm.nama_pengirim = $1 AND bm.deleted_at IS NULL
     `;
     const summary = await pool.query(summaryQuery, [nama]);
     
@@ -283,7 +304,7 @@ const getPembayaranPengirim = async (req, res) => {
       SELECT pbm.tanggal_bayar, SUM(pbm.jumlah_bayar) AS jumlah_bayar, MAX(pbm.created_at) as created_at
       FROM pembayaran_barang_masuk pbm
       JOIN barang_masuk bm ON pbm.barang_masuk_id = bm.id
-      WHERE bm.nama_pengirim = $1
+      WHERE bm.nama_pengirim = $1 AND bm.deleted_at IS NULL
       GROUP BY pbm.tanggal_bayar, DATE_TRUNC('minute', pbm.created_at)
       ORDER BY pbm.tanggal_bayar DESC, created_at DESC
     `;
@@ -305,4 +326,4 @@ const getPembayaranPengirim = async (req, res) => {
   }
 };
 
-module.exports = { getAll, create, update, remove, getPengirimList, addPembayaran, getPembayaran, addPembayaranPengirim, getPembayaranPengirim };
+module.exports = { getAll, create, update, remove, restore, getPengirimList, addPembayaran, getPembayaran, addPembayaranPengirim, getPembayaranPengirim };

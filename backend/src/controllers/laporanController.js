@@ -14,26 +14,30 @@ const getLaporan = async (req, res) => {
     const paramsHP = [];
     
     if (dari && sampai) {
-      dateFilterBM = 'WHERE tanggal BETWEEN $1 AND $2';
+      dateFilterBM = 'WHERE deleted_at IS NULL AND tanggal BETWEEN $1 AND $2';
       paramsBM.push(dari, sampai);
-      dateFilterPJ = 'WHERE tanggal BETWEEN $1 AND $2';
+      dateFilterPJ = 'WHERE deleted_at IS NULL AND tanggal BETWEEN $1 AND $2';
       paramsPJ.push(dari, sampai);
-      dateFilterHP = 'WHERE tanggal BETWEEN $1 AND $2';
+      dateFilterHP = 'WHERE deleted_at IS NULL AND tanggal BETWEEN $1 AND $2';
       paramsHP.push(dari, sampai);
     } else if (dari) {
-      dateFilterBM = 'WHERE tanggal >= $1';
+      dateFilterBM = 'WHERE deleted_at IS NULL AND tanggal >= $1';
       paramsBM.push(dari);
-      dateFilterPJ = 'WHERE tanggal >= $1';
+      dateFilterPJ = 'WHERE deleted_at IS NULL AND tanggal >= $1';
       paramsPJ.push(dari);
-      dateFilterHP = 'WHERE tanggal >= $1';
+      dateFilterHP = 'WHERE deleted_at IS NULL AND tanggal >= $1';
       paramsHP.push(dari);
     } else if (sampai) {
-      dateFilterBM = 'WHERE tanggal <= $1';
+      dateFilterBM = 'WHERE deleted_at IS NULL AND tanggal <= $1';
       paramsBM.push(sampai);
-      dateFilterPJ = 'WHERE tanggal <= $1';
+      dateFilterPJ = 'WHERE deleted_at IS NULL AND tanggal <= $1';
       paramsPJ.push(sampai);
-      dateFilterHP = 'WHERE tanggal <= $1';
+      dateFilterHP = 'WHERE deleted_at IS NULL AND tanggal <= $1';
       paramsHP.push(sampai);
+    } else {
+      dateFilterBM = 'WHERE deleted_at IS NULL';
+      dateFilterPJ = 'WHERE deleted_at IS NULL';
+      dateFilterHP = 'WHERE deleted_at IS NULL';
     }
 
     // Total kg barang masuk & total harga (modal)
@@ -70,7 +74,7 @@ const getLaporan = async (req, res) => {
       `SELECT COALESCE(SUM(p.jumlah_bayar), 0) AS total 
        FROM pembayaran p 
        JOIN hutang_piutang hp ON p.hutang_piutang_id = hp.id 
-       WHERE hp.tipe = 'piutang'${dari && sampai ? ' AND hp.tanggal BETWEEN $1 AND $2' : dari ? ' AND hp.tanggal >= $1' : sampai ? ' AND hp.tanggal <= $1' : ''}`,
+       WHERE hp.tipe = 'piutang' AND hp.deleted_at IS NULL${dari && sampai ? ' AND hp.tanggal BETWEEN $1 AND $2' : dari ? ' AND hp.tanggal >= $1' : sampai ? ' AND hp.tanggal <= $1' : ''}`,
       dari && sampai ? [dari, sampai] : dari ? [dari] : sampai ? [sampai] : []
     );
 
@@ -79,7 +83,7 @@ const getLaporan = async (req, res) => {
       `SELECT COALESCE(SUM(p.jumlah_bayar), 0) AS total 
        FROM pembayaran p 
        JOIN hutang_piutang hp ON p.hutang_piutang_id = hp.id 
-       WHERE hp.tipe = 'hutang'${dari && sampai ? ' AND hp.tanggal BETWEEN $1 AND $2' : dari ? ' AND hp.tanggal >= $1' : sampai ? ' AND hp.tanggal <= $1' : ''}`,
+       WHERE hp.tipe = 'hutang' AND hp.deleted_at IS NULL${dari && sampai ? ' AND hp.tanggal BETWEEN $1 AND $2' : dari ? ' AND hp.tanggal >= $1' : sampai ? ' AND hp.tanggal <= $1' : ''}`,
       dari && sampai ? [dari, sampai] : dari ? [dari] : sampai ? [sampai] : []
     );
 
@@ -88,7 +92,7 @@ const getLaporan = async (req, res) => {
       `SELECT COALESCE(SUM(pbm.jumlah_bayar), 0) AS total 
        FROM pembayaran_barang_masuk pbm 
        JOIN barang_masuk bm ON pbm.barang_masuk_id = bm.id 
-       ${dari && sampai ? ' WHERE bm.tanggal BETWEEN $1 AND $2' : dari ? ' WHERE bm.tanggal >= $1' : sampai ? ' WHERE bm.tanggal <= $1' : ''}`,
+       WHERE bm.deleted_at IS NULL${dari && sampai ? ' AND bm.tanggal BETWEEN $1 AND $2' : dari ? ' AND bm.tanggal >= $1' : sampai ? ' AND bm.tanggal <= $1' : ''}`,
       dari && sampai ? [dari, sampai] : dari ? [dari] : sampai ? [sampai] : []
     );
 
@@ -157,7 +161,7 @@ const getGrafikPenjualan = async (req, res) => {
           COALESCE(SUM(total_uang), 0) AS total_penjualan,
           COALESCE(SUM(kg_terjual), 0) AS total_kg
         FROM penjualan
-        WHERE tanggal >= CURRENT_DATE - INTERVAL '12 weeks'
+        WHERE deleted_at IS NULL AND tanggal >= CURRENT_DATE - INTERVAL '12 weeks'
         GROUP BY DATE_TRUNC('week', tanggal)
         ORDER BY period_start ASC
       `;
@@ -170,7 +174,7 @@ const getGrafikPenjualan = async (req, res) => {
           COALESCE(SUM(total_uang), 0) AS total_penjualan,
           COALESCE(SUM(kg_terjual), 0) AS total_kg
         FROM penjualan
-        WHERE tanggal >= CURRENT_DATE - INTERVAL '12 months'
+        WHERE deleted_at IS NULL AND tanggal >= CURRENT_DATE - INTERVAL '12 months'
         GROUP BY DATE_TRUNC('month', tanggal)
         ORDER BY period_start ASC
       `;
@@ -183,6 +187,7 @@ const getGrafikPenjualan = async (req, res) => {
           COALESCE(SUM(total_uang), 0) AS total_penjualan,
           COALESCE(SUM(kg_terjual), 0) AS total_kg
         FROM penjualan
+        WHERE deleted_at IS NULL
         GROUP BY DATE_TRUNC('year', tanggal)
         ORDER BY period_start ASC
       `;

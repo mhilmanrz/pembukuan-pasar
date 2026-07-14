@@ -3,7 +3,7 @@ const pool = require('../config/db');
 // GET /api/hutang-piutang
 const getAll = async (req, res) => {
   try {
-    const { tipe, dari, sampai } = req.query;
+    const { tipe, dari, sampai, status } = req.query;
     let query = `
       SELECT hp.*, 
         COALESCE(SUM(p.jumlah_bayar), 0) AS total_dibayar,
@@ -14,6 +14,12 @@ const getAll = async (req, res) => {
     const conditions = [];
     const params = [];
     let paramIndex = 1;
+
+    if (status === 'deleted') {
+      conditions.push('hp.deleted_at IS NOT NULL');
+    } else {
+      conditions.push('hp.deleted_at IS NULL');
+    }
 
     if (tipe) {
       conditions.push(`hp.tipe = $${paramIndex++}`);
@@ -90,15 +96,30 @@ const update = async (req, res) => {
 const remove = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('DELETE FROM hutang_piutang WHERE id=$1 RETURNING *', [id]);
+    const result = await pool.query('UPDATE hutang_piutang SET deleted_at = NOW() WHERE id=$1 RETURNING *', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Data tidak ditemukan' });
     }
-    res.json({ message: 'Data berhasil dihapus' });
+    res.json({ message: 'Data berhasil dipindahkan ke tempat sampah' });
   } catch (err) {
     console.error('Error delete hutang_piutang:', err);
     res.status(500).json({ error: 'Gagal menghapus hutang/piutang' });
   }
 };
 
-module.exports = { getAll, create, update, remove };
+// PUT /api/hutang-piutang/:id/restore
+const restore = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('UPDATE hutang_piutang SET deleted_at = NULL WHERE id=$1 RETURNING *', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Data tidak ditemukan' });
+    }
+    res.json({ message: 'Data berhasil dipulihkan' });
+  } catch (err) {
+    console.error('Error restore hutang_piutang:', err);
+    res.status(500).json({ error: 'Gagal memulihkan hutang/piutang' });
+  }
+};
+
+module.exports = { getAll, create, update, remove, restore };
