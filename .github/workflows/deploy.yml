@@ -15,7 +15,7 @@ jobs:
   # Job 1: Deploy Backend ke Railway
   # ==========================================
   deploy-backend:
-    name: 🚂 Deploy Backend to Railway
+    name: Deploy Backend to Railway
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -33,7 +33,7 @@ jobs:
   # Job 2: Deploy Frontend ke Netlify
   # ==========================================
   deploy-frontend:
-    name: 🌐 Deploy Frontend to Netlify
+    name: Deploy Frontend to Netlify
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
