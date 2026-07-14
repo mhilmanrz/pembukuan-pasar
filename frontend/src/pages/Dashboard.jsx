@@ -160,25 +160,43 @@ export default function Dashboard() {
       )}
 
       {/* Cards */}
-      <div className="grid grid-cols-1 gap-4">
-        {cards.map((card) => (
+      <div className="grid grid-cols-2 gap-3">
+        {cards.map((card, index) => (
           <div
             key={card.key}
-            className={`bg-gradient-to-br ${card.color} rounded-2xl p-5 shadow-lg transition-transform duration-200 active:scale-[0.98]`}
+            className={`bg-gradient-to-br ${card.color} rounded-2xl p-4 shadow-lg transition-transform duration-200 active:scale-[0.98] ${index === 0 ? 'col-span-2' : 'col-span-1'}`}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-white/70 font-medium">{card.label}</p>
-                <p className="text-2xl font-bold text-white mt-1">
-                  {loading ? (
-                    <span className="inline-block w-24 h-8 bg-white/20 rounded-lg animate-pulse" />
-                  ) : (
-                    card.format(data?.[card.key] ?? 0)
-                  )}
-                </p>
+            {index === 0 ? (
+              // Layout untuk kartu pertama (Full width)
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/80 font-medium">{card.label}</p>
+                  <p className="text-2xl font-bold text-white mt-1">
+                    {loading ? (
+                      <span className="inline-block w-24 h-8 bg-white/20 rounded-lg animate-pulse" />
+                    ) : (
+                      card.format(data?.[card.key] ?? 0)
+                    )}
+                  </p>
+                </div>
+                <span className="text-4xl opacity-80">{card.icon}</span>
               </div>
-              <span className="text-4xl opacity-80">{card.icon}</span>
-            </div>
+            ) : (
+              // Layout untuk kartu lainnya (Setengah lebar)
+              <div className="flex flex-col h-full gap-2">
+                <span className="text-2xl opacity-80 mb-1">{card.icon}</span>
+                <div className="mt-auto">
+                  <p className="text-[11px] text-white/80 font-medium leading-tight mb-0.5">{card.label}</p>
+                  <p className="text-[15px] sm:text-base font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis">
+                    {loading ? (
+                      <span className="inline-block w-16 h-5 bg-white/20 rounded-lg animate-pulse" />
+                    ) : (
+                      card.format(data?.[card.key] ?? 0)
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
