@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getBarangMasuk, createBarangMasuk, updateBarangMasuk, deleteBarangMasuk, getPengirimList } from '../services/api';
+import { getBarangMasuk, createBarangMasuk, updateBarangMasuk, deleteBarangMasuk, getPengirimList, getPembayaranBM, addPembayaranBM } from '../services/api';
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
+import CurrencyInput from '../components/CurrencyInput';
+import NumberInput from '../components/NumberInput';
 
 // Helper: get week number of a date
 function getWeekLabel(dateStr) {
@@ -37,9 +39,16 @@ export default function BarangMasuk() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  const [form, setForm] = useState({ tanggal: todayStr(), kg: '', nama_pengirim: '', harga: '' });
+  const [form, setForm] = useState({ tanggal: todayStr(), kg: '', nama_pengirim: '', harga: '', sudah_dibayar: '' });
   const [saving, setSaving] = useState(false);
   const [pengirimList, setPengirimList] = useState([]);
+
+  // Payment modal state
+  const [showBayar, setShowBayar] = useState(false);
+  const [selectedBM, setSelectedBM] = useState(null);
+  const [bayarData, setBayarData] = useState(null);
+  const [bayarForm, setBayarForm] = useState({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
+  const [savingBayar, setSavingBayar] = useState(false);
 
   // Filters
   const [filterPengirim, setFilterPengirim] = useState('semua');
@@ -115,10 +124,11 @@ export default function BarangMasuk() {
     filteredItems.forEach(item => {
       const name = item.nama_pengirim;
       if (!map[name]) {
-        map[name] = { nama: name, totalKg: 0, totalHarga: 0, count: 0 };
+        map[name] = { nama: name, totalKg: 0, totalHarga: 0, totalDibayar: 0, count: 0 };
       }
       map[name].totalKg += parseFloat(item.kg) || 0;
       map[name].totalHarga += parseFloat(item.harga) || 0;
+      map[name].totalDibayar += parseFloat(item.total_dibayar) || 0;
       map[name].count += 1;
     });
     return Object.values(map).sort((a, b) => b.totalHarga - a.totalHarga);
@@ -137,7 +147,7 @@ export default function BarangMasuk() {
 
   const openCreate = () => {
     setEditItem(null);
-    setForm({ tanggal: todayStr(), kg: '', nama_pengirim: '', harga: '' });
+    setForm({ tanggal: todayStr(), kg: '', nama_pengirim: '', harga: '', sudah_dibayar: '' });
     setShowForm(true);
   };
 
@@ -178,6 +188,35 @@ export default function BarangMasuk() {
       fetchData();
     } catch (err) {
       alert('Gagal menghapus data');
+    }
+  };
+
+  // Payment modal handlers
+  const openBayar = async (item) => {
+    setSelectedBM(item);
+    setShowBayar(true);
+    setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
+    try {
+      const res = await getPembayaranBM(item.id);
+      setBayarData(res.data);
+    } catch (err) {
+      console.error('Gagal memuat riwayat bayar:', err);
+    }
+  };
+
+  const handleBayar = async (e) => {
+    e.preventDefault();
+    setSavingBayar(true);
+    try {
+      await addPembayaranBM(selectedBM.id, bayarForm);
+      const res = await getPembayaranBM(selectedBM.id);
+      setBayarData(res.data);
+      setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Gagal menambah pembayaran');
+    } finally {
+      setSavingBayar(false);
     }
   };
 
@@ -320,21 +359,32 @@ export default function BarangMasuk() {
           </div>
 
           {/* Per-pengirim breakdown */}
-          {pengirimTotals.length > 1 && (
+          {pengirimTotals.length > 0 && (
             <div className="bg-surface-card border border-border rounded-2xl overflow-hidden">
               <div className="px-4 py-3 border-b border-border">
                 <p className="text-xs text-text-muted font-medium">Rekap per Pengirim</p>
               </div>
               <div className="divide-y divide-border">
-                {pengirimTotals.map((p) => (
-                  <div key={p.nama} className="px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-text-primary">{p.nama}</p>
-                      <p className="text-xs text-text-muted">{p.count}x · {formatKg(p.totalKg)}</p>
+                {pengirimTotals.map((p) => {
+                  const sisaBayar = p.totalHarga - p.totalDibayar;
+                  const lunas = sisaBayar <= 0;
+                  return (
+                    <div key={p.nama} className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <div>
+                          <p className="text-sm font-semibold text-text-primary">{p.nama}</p>
+                          <p className="text-xs text-text-muted">{p.count}x · {formatKg(p.totalKg)}</p>
+                        </div>
+                        <p className="text-sm font-bold text-text-primary">{formatRupiah(p.totalHarga)}</p>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <span className="text-xs text-melon-400">✓ {formatRupiah(p.totalDibayar)}</span>
+                        {!lunas && <span className="text-xs text-amber-400">⏳ Sisa: {formatRupiah(sisaBayar)}</span>}
+                        {lunas && <span className="text-xs text-melon-400 bg-melon-500/10 px-2 py-0.5 rounded-full font-bold">Lunas</span>}
+                      </div>
                     </div>
-                    <p className="text-sm font-bold text-watermelon-400">{formatRupiah(p.totalHarga)}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -365,28 +415,42 @@ export default function BarangMasuk() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredItems.map((item) => (
-            <div key={item.id} className="bg-surface-card rounded-2xl p-4 border border-border hover:border-melon-500/30 transition-colors">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold text-text-primary">{item.nama_pengirim}</span>
-                    <span className="text-xs text-text-muted bg-surface-elevated px-2 py-0.5 rounded-full">
-                      {formatTanggal(item.tanggal)}
-                    </span>
+          {filteredItems.map((item) => {
+            const sisa = parseFloat(item.sisa_bayar) || 0;
+            const dibayar = parseFloat(item.total_dibayar) || 0;
+            const harga = parseFloat(item.harga) || 0;
+            const lunas = sisa <= 0 && harga > 0;
+            return (
+              <div key={item.id} className={`bg-surface-card rounded-2xl p-4 border transition-colors ${lunas ? 'border-melon-500/30' : 'border-border hover:border-amber-500/30'}`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1" onClick={() => openBayar(item)} role="button">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-text-primary">{item.nama_pengirim}</span>
+                      {lunas && <span className="text-xs bg-melon-500/15 text-melon-400 px-2 py-0.5 rounded-full font-bold">✓ Lunas</span>}
+                      <span className="text-xs text-text-muted bg-surface-elevated px-2 py-0.5 rounded-full">
+                        {formatTanggal(item.tanggal)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-melon-400 font-medium">{formatKg(item.kg)}</span>
+                      <span className="text-text-secondary">{formatRupiah(item.harga)}</span>
+                    </div>
+                    {harga > 0 && (
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <span className="text-xs text-melon-400">Dibayar: {formatRupiah(dibayar)}</span>
+                        {!lunas && <span className="text-xs text-amber-400">Sisa: {formatRupiah(sisa)}</span>}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-melon-400 font-medium">{formatKg(item.kg)}</span>
-                    <span className="text-text-secondary">{formatRupiah(item.harga)}</span>
+                  <div className="flex gap-1">
+                    <button onClick={() => openBayar(item)} className="p-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar">💳</button>
+                    <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors">✏️</button>
+                    <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg hover:bg-watermelon-500/10 text-text-muted hover:text-watermelon-400 transition-colors">🗑️</button>
                   </div>
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors">✏️</button>
-                  <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg hover:bg-watermelon-500/10 text-text-muted hover:text-watermelon-400 transition-colors">🗑️</button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -400,13 +464,13 @@ export default function BarangMasuk() {
           </div>
           <div>
             <label className="text-sm text-text-secondary mb-1 block">Berat (kg)</label>
-            <input type="number" step="0.1" value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value })}
-              placeholder="Contoh: 500" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
+            <NumberInput value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value })}
+              allowDecimals={true} suffix="kg" placeholder="Contoh: 500" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
           </div>
           <div>
-            <label className="text-sm text-text-secondary mb-1 block">Harga Total (Rp)</label>
-            <input type="number" value={form.harga} onChange={(e) => setForm({ ...form, harga: e.target.value })}
-              placeholder="Contoh: 2500000" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
+            <label className="text-sm text-text-secondary mb-1 block">Harga Total</label>
+            <CurrencyInput value={form.harga} onChange={(e) => setForm({ ...form, harga: e.target.value })}
+              placeholder="Contoh: 2.500.000" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
           </div>
           <div>
             <label className="text-sm text-text-secondary mb-1 block">Nama Pengirim</label>
@@ -418,11 +482,80 @@ export default function BarangMasuk() {
               required
             />
           </div>
+          {!editItem && (
+            <div>
+              <label className="text-sm text-text-secondary mb-1 block">Sudah Dibayar <span className="text-text-muted">(opsional)</span></label>
+              <CurrencyInput value={form.sudah_dibayar} onChange={(e) => setForm({ ...form, sudah_dibayar: e.target.value })}
+                placeholder="0 jika belum bayar" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" />
+            </div>
+          )}
           <button type="submit" disabled={saving}
             className="w-full bg-melon-500 hover:bg-melon-600 disabled:opacity-50 text-white py-3.5 rounded-xl font-semibold transition-all duration-200 active:scale-[0.98]">
             {saving ? 'Menyimpan...' : editItem ? 'Simpan Perubahan' : 'Tambah Barang'}
           </button>
         </form>
+      </Modal>
+
+      {/* Payment Modal */}
+      <Modal isOpen={showBayar} onClose={() => { setShowBayar(false); setSelectedBM(null); setBayarData(null); }}
+        title={selectedBM ? `Pembayaran — ${selectedBM.nama_pengirim}` : 'Pembayaran'}>
+        {bayarData && (
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="bg-surface-elevated rounded-xl p-4">
+              <p className="text-xs text-text-muted mb-2">{formatTanggal(bayarData.barang_masuk?.tanggal)} · {formatKg(bayarData.barang_masuk?.kg)}</p>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-text-muted">Harga Total</span>
+                <span className="text-text-primary font-medium">{formatRupiah(bayarData.barang_masuk?.harga)}</span>
+              </div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-text-muted">Dibayar</span>
+                <span className="text-melon-400 font-medium">{formatRupiah(bayarData.total_dibayar)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t border-border pt-2 mt-2">
+                <span className="text-text-secondary">Sisa</span>
+                <span className={bayarData.sisa <= 0 ? 'text-melon-400' : 'text-amber-400'}>{formatRupiah(bayarData.sisa)}</span>
+              </div>
+            </div>
+
+            {/* Payment history */}
+            {bayarData.pembayaran?.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-text-secondary mb-2">Riwayat Cicilan</h4>
+                <div className="space-y-2">
+                  {bayarData.pembayaran.map((p) => (
+                    <div key={p.id} className="flex justify-between items-center bg-surface-card rounded-xl px-4 py-3 border border-border">
+                      <span className="text-sm text-text-muted">{formatTanggal(p.tanggal_bayar)}</span>
+                      <span className="text-sm text-melon-400 font-medium">{formatRupiah(p.jumlah_bayar)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Add payment form */}
+            {bayarData.sisa > 0 && (
+              <form onSubmit={handleBayar} className="space-y-3 border-t border-border pt-4">
+                <h4 className="text-sm font-semibold text-text-secondary">Tambah Cicilan</h4>
+                <div>
+                  <label className="text-xs text-text-muted mb-1 block">Tanggal Bayar</label>
+                  <input type="date" value={bayarForm.tanggal_bayar} onChange={(e) => setBayarForm({ ...bayarForm, tanggal_bayar: e.target.value })}
+                    className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-sm text-text-primary" required />
+                </div>
+                <div>
+                  <label className="text-xs text-text-muted mb-1 block">Jumlah Bayar</label>
+                  <CurrencyInput value={bayarForm.jumlah_bayar} onChange={(e) => setBayarForm({ ...bayarForm, jumlah_bayar: e.target.value })}
+                    placeholder={`Maks: ${formatRupiah(bayarData.sisa)}`} className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-sm text-text-primary" required />
+                </div>
+                <button type="submit" disabled={savingBayar}
+                  className="w-full bg-melon-500 hover:bg-melon-600 disabled:opacity-50 text-white py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98]">
+                  {savingBayar ? 'Menyimpan...' : 'Catat Pembayaran'}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+        {!bayarData && <div className="py-8 text-center text-text-muted">Memuat data...</div>}
       </Modal>
     </div>
   );

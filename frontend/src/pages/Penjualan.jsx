@@ -3,6 +3,8 @@ import { getPenjualan, createPenjualan, updatePenjualan, deletePenjualan } from 
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
+import CurrencyInput from '../components/CurrencyInput';
+import NumberInput from '../components/NumberInput';
 
 export default function Penjualan() {
   const [items, setItems] = useState([]);
@@ -156,13 +158,13 @@ export default function Penjualan() {
           </div>
           <div>
             <label className="text-sm text-text-secondary mb-1 block">KG Terjual</label>
-            <input type="number" step="0.1" value={form.kg_terjual} onChange={(e) => setForm({ ...form, kg_terjual: e.target.value })}
-              placeholder="Contoh: 150" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
+            <NumberInput value={form.kg_terjual} onChange={(e) => setForm({ ...form, kg_terjual: e.target.value })}
+              allowDecimals={true} suffix="kg" placeholder="Contoh: 150" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
           </div>
           <div>
-            <label className="text-sm text-text-secondary mb-1 block">Total Uang (Rp)</label>
-            <input type="number" value={form.total_uang} onChange={(e) => setForm({ ...form, total_uang: e.target.value })}
-              placeholder="Contoh: 750000" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
+            <label className="text-sm text-text-secondary mb-1 block">Total Uang</label>
+            <CurrencyInput value={form.total_uang} onChange={(e) => setForm({ ...form, total_uang: e.target.value })}
+              placeholder="Contoh: 750.000" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
           </div>
           <button type="submit" disabled={saving}
             className="w-full bg-watermelon-500 hover:bg-watermelon-600 disabled:opacity-50 text-white py-3.5 rounded-xl font-semibold transition-all duration-200 active:scale-[0.98]">

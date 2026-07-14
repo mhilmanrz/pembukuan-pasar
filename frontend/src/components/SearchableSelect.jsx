@@ -137,14 +137,18 @@ export default function SearchableSelect({ value, onChange, options = [], placeh
 
           {/* New item badge */}
           {showNewBadge && (
-            <div className="border-t border-border px-4 py-2.5 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleSelect(query.trim())}
+              className="w-full border-t border-border px-4 py-2.5 flex items-center gap-2 hover:bg-surface-card transition-colors text-left"
+            >
               <span className="inline-flex items-center gap-1 bg-melon-500/15 text-melon-400 text-xs font-medium px-2 py-1 rounded-full">
                 ✨ Baru
               </span>
               <span className="text-sm text-text-secondary truncate">
                 Tambah "<span className="text-text-primary font-medium">{query.trim()}</span>"
               </span>
-            </div>
+            </button>
           )}
         </div>
       )}

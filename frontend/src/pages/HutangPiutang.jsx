@@ -3,6 +3,8 @@ import { getHutangPiutang, createHutangPiutang, updateHutangPiutang, deleteHutan
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
+import CurrencyInput from '../components/CurrencyInput';
+import NumberInput from '../components/NumberInput';
 
 export default function HutangPiutang() {
   const [items, setItems] = useState([]);
@@ -245,13 +247,13 @@ export default function HutangPiutang() {
           </div>
           <div>
             <label className="text-sm text-text-secondary mb-1 block">KG (opsional)</label>
-            <input type="number" step="0.1" value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value })}
-              placeholder="Berat semangka" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" />
+            <NumberInput value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value })}
+              allowDecimals={true} suffix="kg" placeholder="Berat semangka" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" />
           </div>
           <div>
-            <label className="text-sm text-text-secondary mb-1 block">Jumlah Total (Rp)</label>
-            <input type="number" value={form.jumlah_total} onChange={(e) => setForm({ ...form, jumlah_total: e.target.value })}
-              placeholder="Contoh: 500000" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
+            <label className="text-sm text-text-secondary mb-1 block">Jumlah Total</label>
+            <CurrencyInput value={form.jumlah_total} onChange={(e) => setForm({ ...form, jumlah_total: e.target.value })}
+              placeholder="Contoh: 500.000" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
           </div>
           <div>
             <label className="text-sm text-text-secondary mb-1 block">Keterangan (opsional)</label>
@@ -311,8 +313,8 @@ export default function HutangPiutang() {
                     className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-sm text-text-primary" required />
                 </div>
                 <div>
-                  <label className="text-xs text-text-muted mb-1 block">Jumlah Bayar (Rp)</label>
-                  <input type="number" value={bayarForm.jumlah_bayar} onChange={(e) => setBayarForm({ ...bayarForm, jumlah_bayar: e.target.value })}
+                  <label className="text-xs text-text-muted mb-1 block">Jumlah Bayar</label>
+                  <CurrencyInput value={bayarForm.jumlah_bayar} onChange={(e) => setBayarForm({ ...bayarForm, jumlah_bayar: e.target.value })}
                     placeholder={`Maks: ${formatRupiah(bayarData.sisa)}`} className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-sm text-text-primary" required />
                 </div>
                 <button type="submit" disabled={savingBayar}

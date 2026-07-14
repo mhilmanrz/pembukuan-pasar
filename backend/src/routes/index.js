@@ -10,6 +10,8 @@ const laporanController = require('../controllers/laporanController');
 router.get('/barang-masuk', barangMasukController.getAll);
 router.get('/barang-masuk/pengirim', barangMasukController.getPengirimList);
 router.post('/barang-masuk', barangMasukController.create);
+router.get('/barang-masuk/:id/bayar', barangMasukController.getPembayaran);
+router.post('/barang-masuk/:id/bayar', barangMasukController.addPembayaran);
 router.put('/barang-masuk/:id', barangMasukController.update);
 router.delete('/barang-masuk/:id', barangMasukController.remove);
 

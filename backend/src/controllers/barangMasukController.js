@@ -4,21 +4,33 @@ const pool = require('../config/db');
 const getAll = async (req, res) => {
   try {
     const { dari, sampai } = req.query;
-    let query = 'SELECT * FROM barang_masuk';
+    let query = `
+      SELECT bm.*, 
+        COALESCE(SUM(pbm.jumlah_bayar), 0) AS total_dibayar,
+        bm.harga - COALESCE(SUM(pbm.jumlah_bayar), 0) AS sisa_bayar
+      FROM barang_masuk bm
+      LEFT JOIN pembayaran_barang_masuk pbm ON pbm.barang_masuk_id = bm.id
+    `;
+    const conditions = [];
     const params = [];
+    let paramIndex = 1;
 
     if (dari && sampai) {
-      query += ' WHERE tanggal BETWEEN $1 AND $2';
+      conditions.push(`bm.tanggal BETWEEN $${paramIndex++} AND $${paramIndex++}`);
       params.push(dari, sampai);
     } else if (dari) {
-      query += ' WHERE tanggal >= $1';
+      conditions.push(`bm.tanggal >= $${paramIndex++}`);
       params.push(dari);
     } else if (sampai) {
-      query += ' WHERE tanggal <= $1';
+      conditions.push(`bm.tanggal <= $${paramIndex++}`);
       params.push(sampai);
     }
 
-    query += ' ORDER BY tanggal DESC, created_at DESC';
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    query += ' GROUP BY bm.id ORDER BY bm.tanggal DESC, bm.created_at DESC';
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
@@ -30,15 +42,46 @@ const getAll = async (req, res) => {
 // POST /api/barang-masuk
 const create = async (req, res) => {
   try {
-    const { tanggal, kg, nama_pengirim, harga } = req.body;
+    const { tanggal, kg, nama_pengirim, harga, sudah_dibayar } = req.body;
     if (!tanggal || !kg || !nama_pengirim || harga === undefined) {
       return res.status(400).json({ error: 'Semua field wajib diisi' });
     }
-    const result = await pool.query(
-      'INSERT INTO barang_masuk (tanggal, kg, nama_pengirim, harga) VALUES ($1, $2, $3, $4) RETURNING *',
-      [tanggal, kg, nama_pengirim, harga]
-    );
-    res.status(201).json(result.rows[0]);
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const result = await client.query(
+        'INSERT INTO barang_masuk (tanggal, kg, nama_pengirim, harga) VALUES ($1, $2, $3, $4) RETURNING *',
+        [tanggal, kg, nama_pengirim, harga]
+      );
+      const barangMasuk = result.rows[0];
+
+      // If initial payment provided, record it
+      const initialPayment = parseFloat(sudah_dibayar) || 0;
+      if (initialPayment > 0) {
+        if (initialPayment > parseFloat(harga)) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'Jumlah bayar melebihi harga' });
+        }
+        await client.query(
+          'INSERT INTO pembayaran_barang_masuk (barang_masuk_id, tanggal_bayar, jumlah_bayar) VALUES ($1, $2, $3)',
+          [barangMasuk.id, tanggal, initialPayment]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      // Return with payment info
+      barangMasuk.total_dibayar = initialPayment;
+      barangMasuk.sisa_bayar = parseFloat(harga) - initialPayment;
+      res.status(201).json(barangMasuk);
+    } catch (innerErr) {
+      await client.query('ROLLBACK');
+      throw innerErr;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     console.error('Error create barang_masuk:', err);
     res.status(500).json({ error: 'Gagal menambah barang masuk' });
@@ -92,4 +135,72 @@ const getPengirimList = async (req, res) => {
   }
 };
 
-module.exports = { getAll, create, update, remove, getPengirimList };
+// POST /api/barang-masuk/:id/bayar — Add installment payment
+const addPembayaran = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tanggal_bayar, jumlah_bayar } = req.body;
+
+    if (!tanggal_bayar || !jumlah_bayar) {
+      return res.status(400).json({ error: 'Tanggal bayar dan jumlah bayar wajib diisi' });
+    }
+
+    // Get the barang_masuk record
+    const bm = await pool.query('SELECT * FROM barang_masuk WHERE id = $1', [id]);
+    if (bm.rows.length === 0) {
+      return res.status(404).json({ error: 'Data barang masuk tidak ditemukan' });
+    }
+
+    // Check remaining balance
+    const paid = await pool.query(
+      'SELECT COALESCE(SUM(jumlah_bayar), 0) AS total_paid FROM pembayaran_barang_masuk WHERE barang_masuk_id = $1',
+      [id]
+    );
+    const sisa = parseFloat(bm.rows[0].harga) - parseFloat(paid.rows[0].total_paid);
+
+    if (parseFloat(jumlah_bayar) > sisa) {
+      return res.status(400).json({ error: `Jumlah bayar melebihi sisa (${sisa})` });
+    }
+
+    const result = await pool.query(
+      'INSERT INTO pembayaran_barang_masuk (barang_masuk_id, tanggal_bayar, jumlah_bayar) VALUES ($1, $2, $3) RETURNING *',
+      [id, tanggal_bayar, jumlah_bayar]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Error addPembayaran barang_masuk:', err);
+    res.status(500).json({ error: 'Gagal menambah pembayaran' });
+  }
+};
+
+// GET /api/barang-masuk/:id/bayar — Get payment history for a barang_masuk record
+const getPembayaran = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const bm = await pool.query('SELECT * FROM barang_masuk WHERE id = $1', [id]);
+    if (bm.rows.length === 0) {
+      return res.status(404).json({ error: 'Data barang masuk tidak ditemukan' });
+    }
+
+    const payments = await pool.query(
+      'SELECT * FROM pembayaran_barang_masuk WHERE barang_masuk_id = $1 ORDER BY tanggal_bayar DESC, created_at DESC',
+      [id]
+    );
+
+    const totalDibayar = payments.rows.reduce((sum, p) => sum + parseFloat(p.jumlah_bayar), 0);
+
+    res.json({
+      barang_masuk: bm.rows[0],
+      pembayaran: payments.rows,
+      total_dibayar: totalDibayar,
+      sisa: parseFloat(bm.rows[0].harga) - totalDibayar,
+    });
+  } catch (err) {
+    console.error('Error getPembayaran barang_masuk:', err);
+    res.status(500).json({ error: 'Gagal mengambil data pembayaran' });
+  }
+};
+
+module.exports = { getAll, create, update, remove, getPengirimList, addPembayaran, getPembayaran };
