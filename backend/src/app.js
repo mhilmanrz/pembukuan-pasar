@@ -9,16 +9,23 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4173',
   process.env.FRONTEND_URL,
-].filter(Boolean);
+].filter(Boolean).map(url => url.replace(/\/+$/, '')); // strip trailing slash
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (mobile apps, Postman, health checks)
+    if (!origin) return callback(null, true);
+    
+    const normalizedOrigin = origin.replace(/\/+$/, '');
+    if (allowedOrigins.includes(normalizedOrigin)) {
       callback(null, true);
     } else {
+      console.error(`❌ CORS blocked origin: ${origin}`);
+      console.error(`   Allowed origins: ${allowedOrigins.join(', ')}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
+  credentials: true,
 }));
 
 app.use(express.json());
