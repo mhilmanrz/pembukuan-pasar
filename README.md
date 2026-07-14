@@ -1,63 +1,85 @@
-# 🍉 Pembukuan Semangka
+# 🍉 Pembukuan Semangka (v1.0.0)
 
-Aplikasi web pembukuan penjualan semangka — mobile-first, untuk pemilik usaha single-user.
+Aplikasi web pembukuan operasional bisnis penjualan semangka tingkat grosir/pasar. Dirancang dengan pendekatan *mobile-first* (nyaman dibuka di HP) untuk mempermudah pemilik usaha mengelola stok, penjualan, serta pencatatan hutang/piutang secara *real-time* dan akurat.
 
-## Fitur
+![Dashboard Preview](https://via.placeholder.com/800x400.png?text=Pembukuan+Semangka+Dashboard) *(Ilustrasi Dashboard)*
 
-- **Dashboard** — Ringkasan sisa stok, omzet, kas diterima, piutang & hutang
-- **Barang Masuk** — Catat stok semangka yang masuk (kg, pengirim, harga)
-- **Penjualan** — Catat penjualan per sesi siang/malam
-- **Hutang & Piutang** — Kelola hutang ke pengirim & piutang dari pembeli, termasuk cicilan
-- **Riwayat** — Gabungan semua transaksi dengan filter tanggal
+## ✨ Fitur Unggulan
 
-## Tech Stack
+Aplikasi ini telah mencapai versi stabil pertama dengan fitur lengkap:
 
-- **Frontend**: React + Vite + Tailwind CSS v4
-- **Backend**: Node.js + Express
+- 📊 **Dashboard Analitik & Visualisasi**
+  Pantau sisa stok (kg), omzet, modal, keuntungan bersih, kas diterima, serta hutang/piutang secara *real-time*. Dilengkapi grafik riwayat penjualan interaktif.
+- 📦 **Manajemen Barang Masuk (Restock)**
+  Catat penerimaan barang beserta harga modal. Dilengkapi fitur **unggah foto nota/barang** (otomatis di-compress maksimal 500KB) dan sistem pembayaran bertahap (cicilan/sisa tagihan) kepada pengirim dengan logika FIFO (*First In First Out*).
+- 💰 **Pencatatan Penjualan Harian**
+  Catat rekap penjualan harian dengan pembagian shift/sesi (Siang/Malam), lengkap dengan total Kg terjual dan uang masuk.
+- 📋 **Buku Hutang & Piutang**
+  Lacak dengan mudah siapa yang belum bayar (piutang) dan tagihan yang belum dilunasi (hutang), lengkap dengan riwayat cicilan pembayarannya. Total hutang barang masuk otomatis sinkron ke halaman ini.
+- 🗑️ **Sistem Keamanan Data (Soft Delete)**
+  Data yang dihapus tidak langsung hilang! Semua transaksi yang "dihapus" akan masuk ke menu "Riwayat" (Mode Keranjang Sampah) dan **bisa dipulihkan (restore)** kembali kapan saja.
+- 🔎 **Filter Pintar**
+  Semua halaman dilengkapi filter periode otomatis (Bulan Ini, Minggu Ini, Hari Ini, Semua) untuk mempermudah rekap pembukuan harian maupun bulanan.
+
+## 🛠️ Tech Stack & Infrastruktur
+
+- **Frontend**: React.js, Vite, Tailwind CSS v4
+- **Backend**: Node.js, Express.js
 - **Database**: PostgreSQL
+- **Deployment**: Netlify (Frontend) & Railway (Backend + DB)
 
-## Setup Lokal
+## 🚀 CI/CD & Automasi (Deployment)
 
-### 1. Database
-Buat database PostgreSQL lalu jalankan migration:
+Proyek ini menggunakan **GitHub Actions** untuk *Continuous Integration/Continuous Deployment* (CI/CD). Setiap *push* ke *branch* `main` akan memicu:
+1. Pengecekan otomatis dan *build* proyek.
+2. *Auto-deploy* backend ke **Railway**.
+3. *Auto-deploy* frontend ke **Netlify**.
+
+## 💻 Cara Install & Menjalankan Lokal
+
+Jika Anda ingin menjalankan atau mengembangkan aplikasi ini secara lokal di PC Anda:
+
+### 1. Database (PostgreSQL)
+Buat database PostgreSQL kosong, lalu jalankan migrasi tabel:
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env sesuai koneksi database Anda
+# Edit .env, ganti DATABASE_URL sesuai koneksi database lokal Anda
 npm install
 npm run migrate
 ```
 
-### 2. Backend
+### 2. Backend (API Server)
 ```bash
 cd backend
 npm run dev
-# Server jalan di http://localhost:5000
+# Server akan berjalan di http://localhost:5000
 ```
 
-### 3. Frontend
+### 3. Frontend (Web App)
+Buka tab terminal baru:
 ```bash
 cd frontend
 npm install
 npm run dev
-# App jalan di http://localhost:5173
+# Aplikasi web akan berjalan di http://localhost:5173
 ```
 
-## Deployment
+## ⚙️ Environment Variables
 
-- **Backend + DB**: Railway (set `DATABASE_URL` dan `FRONTEND_URL` env vars)
-- **Frontend**: Netlify (set `VITE_API_URL` env var ke URL backend Railway)
+Aplikasi ini membutuhkan file `.env` untuk berjalan.
 
-## Environment Variables
-
-### Backend (.env)
+### Backend (`backend/.env`)
 | Variable | Keterangan |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `PORT` | Port server (default: 5000) |
-| `FRONTEND_URL` | URL frontend untuk CORS |
+| `DATABASE_URL` | PostgreSQL connection string (Wajib) |
+| `PORT` | Port server backend (Default: 5000) |
+| `FRONTEND_URL` | URL frontend untuk mengatur CORS (Keamanan akses) |
 
-### Frontend (.env)
+### Frontend (`frontend/.env`)
 | Variable | Keterangan |
 |---|---|
-| `VITE_API_URL` | URL backend API (contoh: `https://your-app.railway.app/api`) |
+| `VITE_API_URL` | URL dari backend API (contoh saat live: `https://app-backend.railway.app/api`) |
+
+---
+*Dibuat untuk mempermudah operasional pasar. 🍉*
