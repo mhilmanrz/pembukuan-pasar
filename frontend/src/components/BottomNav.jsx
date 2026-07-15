@@ -4,7 +4,7 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: '📊' },
   { to: '/barang-masuk', label: 'Stok Masuk', icon: '📦' },
   { to: '/penjualan', label: 'Penjualan', icon: '💰' },
-  { to: '/hutang-piutang', label: 'Hutang/Piutang', icon: '📋' },
+  { to: '/piutang', label: 'Piutang', icon: '📋' },
   { to: '/riwayat', label: 'Riwayat', icon: '📜' },
 ];
 

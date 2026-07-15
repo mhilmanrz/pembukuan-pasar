@@ -3,7 +3,7 @@ import BottomNav from './components/BottomNav';
 import Dashboard from './pages/Dashboard';
 import BarangMasuk from './pages/BarangMasuk';
 import Penjualan from './pages/Penjualan';
-import HutangPiutang from './pages/HutangPiutang';
+import Piutang from './pages/Piutang';
 import Riwayat from './pages/Riwayat';
 
 export default function App() {
@@ -15,7 +15,7 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/barang-masuk" element={<BarangMasuk />} />
             <Route path="/penjualan" element={<Penjualan />} />
-            <Route path="/hutang-piutang" element={<HutangPiutang />} />
+            <Route path="/piutang" element={<Piutang />} />
             <Route path="/riwayat" element={<Riwayat />} />
           </Routes>
         </main>

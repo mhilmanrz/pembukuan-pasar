@@ -8,31 +8,25 @@ import SearchableSelect from '../components/SearchableSelect';
 import CurrencyInput from '../components/CurrencyInput';
 import NumberInput from '../components/NumberInput';
 
-// Helper: get week number of a date
-function getWeekLabel(dateStr) {
-  const d = new Date(dateStr);
-  const start = new Date(d.getFullYear(), d.getMonth(), 1);
-  const weekNum = Math.ceil((d.getDate() + start.getDay()) / 7);
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  return `Minggu ${weekNum} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-function getMonthLabel(dateStr) {
-  const d = new Date(dateStr);
-  const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-  return `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-function getMonthValue(dateStr) {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getWeekValue(dateStr) {
-  const d = new Date(dateStr);
-  const start = new Date(d.getFullYear(), d.getMonth(), 1);
-  const weekNum = Math.ceil((d.getDate() + start.getDay()) / 7);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-W${weekNum}`;
+// Helper to get date range params from filter
+function getDateParams(filter, dari, sampai) {
+  const now = new Date();
+  const today = todayStr();
+  switch (filter) {
+    case 'hari-ini':
+      return { dari: today, sampai: today };
+    case 'minggu-ini': {
+      const start = new Date(now);
+      start.setDate(now.getDate() - now.getDay());
+      return { dari: start.toISOString().split('T')[0], sampai: today };
+    }
+    case 'bulan-ini':
+      return { dari: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, sampai: today };
+    case 'custom':
+      return { dari, sampai };
+    default:
+      return {};
+  }
 }
 
 export default function BarangMasuk() {
@@ -48,22 +42,26 @@ export default function BarangMasuk() {
 
   // Payment modal state
   const [showBayar, setShowBayar] = useState(false);
-  const [selectedBM, setSelectedBM] = useState(null);
+  const [selectedBM, setSelectedBM] = useState(null); // To store nama_pengirim
   const [bayarData, setBayarData] = useState(null);
   const [bayarForm, setBayarForm] = useState({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
   const [savingBayar, setSavingBayar] = useState(false);
 
+  // Accordion state for summary detail
+  const [expandedPengirim, setExpandedPengirim] = useState(null);
+
   // Filters
-  const [filterPengirim, setFilterPengirim] = useState('semua');
-  const [filterPeriode, setFilterPeriode] = useState('bulan'); // semua, bulan, minggu
-  const [filterBulan, setFilterBulan] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
-  const [filterMinggu, setFilterMinggu] = useState('');
+  const [filter, setFilter] = useState('bulan-ini');
+  const [dari, setDari] = useState('');
+  const [sampai, setSampai] = useState(todayStr());
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
+    if (filter === 'custom' && (!dari || !sampai)) return;
     fetchData();
+  }, [filter, dari, sampai]);
+
+  useEffect(() => {
     fetchPengirimList();
   }, []);
 
@@ -79,7 +77,8 @@ export default function BarangMasuk() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await getBarangMasuk();
+      const params = getDateParams(filter, dari, sampai);
+      const res = await getBarangMasuk(params);
       setItems(res.data);
     } catch (err) {
       console.error('Gagal memuat data:', err);
@@ -88,41 +87,11 @@ export default function BarangMasuk() {
     }
   };
 
-  // Derive available months & weeks from data
-  const availableMonths = useMemo(() => {
-    const set = new Map();
-    items.forEach(item => {
-      const val = getMonthValue(item.tanggal);
-      if (!set.has(val)) set.set(val, getMonthLabel(item.tanggal));
-    });
-    return [...set.entries()].sort((a, b) => b[0].localeCompare(a[0]));
-  }, [items]);
-
-  const availableWeeks = useMemo(() => {
-    const set = new Map();
-    items.forEach(item => {
-      const val = getWeekValue(item.tanggal);
-      if (!set.has(val)) set.set(val, getWeekLabel(item.tanggal));
-    });
-    return [...set.entries()].sort((a, b) => b[0].localeCompare(a[0]));
-  }, [items]);
-
-  // Apply filters
+  // Apply filters (search)
   const filteredItems = useMemo(() => {
-    let result = items;
-
-    if (filterPengirim !== 'semua') {
-      result = result.filter(item => item.nama_pengirim === filterPengirim);
-    }
-
-    if (filterPeriode === 'bulan' && filterBulan) {
-      result = result.filter(item => getMonthValue(item.tanggal) === filterBulan);
-    } else if (filterPeriode === 'minggu' && filterMinggu) {
-      result = result.filter(item => getWeekValue(item.tanggal) === filterMinggu);
-    }
-
-    return result;
-  }, [items, filterPengirim, filterPeriode, filterBulan, filterMinggu]);
+    if (!searchQuery) return items;
+    return items.filter(item => item.nama_pengirim === searchQuery);
+  }, [items, searchQuery]);
 
   // Totals per pengirim
   const pengirimTotals = useMemo(() => {
@@ -130,12 +99,13 @@ export default function BarangMasuk() {
     filteredItems.forEach(item => {
       const name = item.nama_pengirim;
       if (!map[name]) {
-        map[name] = { nama: name, totalKg: 0, totalHarga: 0, totalDibayar: 0, count: 0 };
+        map[name] = { nama: name, totalKg: 0, totalHarga: 0, totalDibayar: 0, count: 0, items: [] };
       }
       map[name].totalKg += parseFloat(item.kg) || 0;
       map[name].totalHarga += parseFloat(item.harga) || 0;
       map[name].totalDibayar += parseFloat(item.total_dibayar) || 0;
       map[name].count += 1;
+      map[name].items.push(item);
     });
     return Object.values(map).sort((a, b) => b.totalHarga - a.totalHarga);
   }, [filteredItems]);
@@ -242,7 +212,7 @@ export default function BarangMasuk() {
       const res = await getPembayaranPengirim(nama_pengirim);
       setBayarData(res.data);
     } catch (err) {
-      console.error('Gagal memuat riwayat bayar:', err);
+      console.error('Gagal memuat detail tagihan:', err);
     }
   };
 
@@ -256,132 +226,73 @@ export default function BarangMasuk() {
       setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.error || 'Gagal menambah pembayaran');
+      alert(err.response?.data?.error || 'Gagal menyimpan pembayaran');
     } finally {
       setSavingBayar(false);
     }
   };
 
-  const resetFilters = () => {
-    setFilterPengirim('semua');
-    setFilterPeriode('semua');
-    setFilterBulan('');
-    setFilterMinggu('');
-  };
-
-  const hasActiveFilter = filterPengirim !== 'semua' || filterPeriode !== 'semua';
-
   return (
     <div>
       <PageHeader
-        title="Barang Masuk"
-        subtitle="Catat stok semangka yang masuk"
+        title="Stok Masuk"
+        subtitle="Catat penerimaan semangka"
         action={
-          <button
-            onClick={openCreate}
-            className="bg-melon-500 hover:bg-melon-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 shadow-lg shadow-melon-500/25 active:scale-95"
-          >
-            + Tambah
+          <button onClick={openCreate}
+            className="bg-melon-500 hover:bg-melon-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 shadow-lg shadow-melon-500/25 active:scale-95">
+            + Catat
           </button>
         }
       />
 
       {/* Filters */}
-      <div className="space-y-3 mb-6">
+      <div className="mb-6 space-y-3">
         {/* Filter Pengirim */}
-        <div>
-          <label className="text-xs text-text-muted mb-1.5 block font-medium">Pengirim</label>
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        <SearchableSelect
+          value={searchQuery}
+          onChange={(val) => setSearchQuery(val)}
+          options={pengirimList}
+          placeholder="Ketik & pilih nama pengirim (kosongkan untuk tampil semua)"
+          allowNew={false}
+        />
+
+        {/* Date filter chips */}
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+          {[
+            { val: 'bulan-ini', label: 'Bulan Ini' },
+            { val: 'minggu-ini', label: 'Minggu Ini' },
+            { val: 'hari-ini', label: 'Hari Ini' },
+            { val: 'semua', label: 'Semua' },
+            { val: 'custom', label: 'Custom' },
+          ].map((f) => (
             <button
-              onClick={() => setFilterPengirim('semua')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                filterPengirim === 'semua'
+              key={f.val}
+              onClick={() => setFilter(f.val)}
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                filter === f.val
                   ? 'bg-melon-500 text-white shadow-lg shadow-melon-500/25'
                   : 'bg-surface-card text-text-secondary hover:bg-surface-elevated'
               }`}
             >
-              Semua
+              {f.label}
             </button>
-            {pengirimList.map((name) => (
-              <button
-                key={name}
-                onClick={() => setFilterPengirim(name)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                  filterPengirim === name
-                    ? 'bg-melon-500 text-white shadow-lg shadow-melon-500/25'
-                    : 'bg-surface-card text-text-secondary hover:bg-surface-elevated'
-                }`}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
 
-        {/* Filter Periode */}
-        <div>
-          <label className="text-xs text-text-muted mb-1.5 block font-medium">Periode</label>
-          <div className="flex gap-2 items-center">
-            {[
-              { val: 'bulan', label: 'Bulanan' },
-              { val: 'minggu', label: 'Mingguan' },
-              { val: 'semua', label: 'Semua' },
-            ].map((opt) => (
-              <button
-                key={opt.val}
-                onClick={() => {
-                  setFilterPeriode(opt.val);
-                  if (opt.val === 'bulan' && !filterBulan && availableMonths.length > 0) {
-                    setFilterBulan(availableMonths[0][0]);
-                  }
-                  if (opt.val === 'minggu' && !filterMinggu && availableWeeks.length > 0) {
-                    setFilterMinggu(availableWeeks[0][0]);
-                  }
-                }}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                  filterPeriode === opt.val
-                    ? 'bg-watermelon-500 text-white shadow-lg shadow-watermelon-500/25'
-                    : 'bg-surface-card text-text-secondary hover:bg-surface-elevated'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-
-            {/* Dropdown bulan/minggu */}
-            {filterPeriode === 'bulan' && availableMonths.length > 0 && (
-              <select
-                value={filterBulan}
-                onChange={(e) => setFilterBulan(e.target.value)}
-                className="bg-surface-card border border-border rounded-xl px-3 py-1.5 text-xs text-text-primary flex-1 min-w-0"
-              >
-                {availableMonths.map(([val, label]) => (
-                  <option key={val} value={val}>{label}</option>
-                ))}
-              </select>
-            )}
-            {filterPeriode === 'minggu' && availableWeeks.length > 0 && (
-              <select
-                value={filterMinggu}
-                onChange={(e) => setFilterMinggu(e.target.value)}
-                className="bg-surface-card border border-border rounded-xl px-3 py-1.5 text-xs text-text-primary flex-1 min-w-0"
-              >
-                {availableWeeks.map(([val, label]) => (
-                  <option key={val} value={val}>{label}</option>
-                ))}
-              </select>
-            )}
+        {/* Custom date range */}
+        {filter === 'custom' && (
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="text-xs text-text-muted mb-1 block">Dari</label>
+              <input type="date" value={dari} onChange={(e) => setDari(e.target.value)}
+                className="w-full bg-surface-card border border-border rounded-xl px-3 py-2 text-sm text-text-primary" />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-text-muted mb-1 block">Sampai</label>
+              <input type="date" value={sampai} onChange={(e) => setSampai(e.target.value)}
+                className="w-full bg-surface-card border border-border rounded-xl px-3 py-2 text-sm text-text-primary" />
+            </div>
           </div>
-        </div>
-
-        {/* Reset filter */}
-        {hasActiveFilter && (
-          <button
-            onClick={resetFilters}
-            className="text-xs text-text-muted hover:text-watermelon-400 transition-colors"
-          >
-            ✕ Reset Filter
-          </button>
         )}
       </div>
 
@@ -392,8 +303,8 @@ export default function BarangMasuk() {
           <div className="bg-gradient-to-br from-melon-600 to-melon-800 rounded-2xl p-4 shadow-lg">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
-                <p className="text-xs text-white/60 font-medium">Total ({filteredItems.length} transaksi)</p>
-                <p className="text-lg font-bold text-white">{formatRupiah(grandTotal.harga)}</p>
+                <p className="text-xs text-white/60 font-medium">Total Hutang ({filteredItems.length} transaksi)</p>
+                <p className="text-xl font-bold text-white">{formatRupiah(grandTotal.harga)}</p>
                 <p className="text-xs text-white/80">{formatKg(grandTotal.kg)}</p>
                 
                 <div className="flex gap-4 pt-2 border-t border-white/20 mt-2">
@@ -433,11 +344,34 @@ export default function BarangMasuk() {
                           <button onClick={() => openBayar(p.nama)} className="p-2 -mr-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar Tagihan">💳</button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-xs text-melon-400">✓ {formatRupiah(p.totalDibayar)}</span>
-                        {!lunas && <span className="text-xs text-amber-400">⏳ Sisa: {formatRupiah(sisaBayar)}</span>}
-                        {lunas && <span className="text-xs text-melon-400 bg-melon-500/10 px-2 py-0.5 rounded-full font-bold">Lunas</span>}
+                      <div className="flex items-center justify-between mt-1.5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-melon-400">✓ Dibayar: {formatRupiah(p.totalDibayar)}</span>
+                          {!lunas && <span className="text-xs text-amber-400">⏳ Sisa: {formatRupiah(sisaBayar)}</span>}
+                          {lunas && <span className="text-xs text-melon-400 bg-melon-500/10 px-2 py-0.5 rounded-full font-bold">Lunas</span>}
+                        </div>
+                        <button 
+                          onClick={() => setExpandedPengirim(expandedPengirim === p.nama ? null : p.nama)}
+                          className="text-[10px] text-melon-500 hover:bg-melon-50 font-medium px-2 py-1 border border-melon-100 rounded-lg transition-colors"
+                        >
+                          {expandedPengirim === p.nama ? 'Tutup Detail' : 'Lihat Detail'}
+                        </button>
                       </div>
+                      
+                      {/* Expanded Transaction Details */}
+                      {expandedPengirim === p.nama && (
+                        <div className="mt-3 pt-3 border-t border-border space-y-2 animate-slide-down">
+                          {p.items.map((item, idx) => (
+                            <div key={item.id} className="flex justify-between items-center bg-surface px-3 py-2 rounded-lg border border-border">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] text-text-muted">Trx {p.items.length - idx} • {formatTanggal(item.tanggal)}</span>
+                                <span className="text-xs font-medium text-text-primary">{formatKg(item.kg)}</span>
+                              </div>
+                              <span className="text-xs font-bold text-text-primary">{formatRupiah(item.harga)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -459,55 +393,40 @@ export default function BarangMasuk() {
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="text-center py-16">
-          <span className="text-5xl mb-4 block">{hasActiveFilter ? '🔍' : '📦'}</span>
-          <p className="text-text-muted">
-            {hasActiveFilter ? 'Tidak ada data yang cocok dengan filter' : 'Belum ada data barang masuk'}
-          </p>
-          {hasActiveFilter && (
-            <button onClick={resetFilters} className="mt-3 text-sm text-melon-400 hover:text-melon-300 transition-colors">
-              Reset Filter
-            </button>
-          )}
+          <span className="text-5xl mb-4 block">📦</span>
+          <p className="text-text-muted">Data stok masuk tidak ditemukan</p>
         </div>
       ) : (
         <div className="space-y-3">
           {filteredItems.map((item) => {
-            const sisa = parseFloat(item.sisa_bayar) || 0;
-            const dibayar = parseFloat(item.total_dibayar) || 0;
-            const harga = parseFloat(item.harga) || 0;
-            const lunas = sisa <= 0 && harga > 0;
+            const sisa = parseFloat(item.sisa_bayar);
+            const lunas = sisa <= 0;
             return (
-              <div key={item.id} className={`bg-surface-card rounded-2xl p-4 border transition-colors ${lunas ? 'border-melon-500/30' : 'border-border hover:border-amber-500/30'}`}>
+              <div key={item.id} className={`bg-surface-card rounded-2xl p-4 border transition-colors ${lunas ? 'border-melon-500/30' : 'border-border hover:border-melon-500/30'}`}>
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
+                  <div className="flex-1" onClick={() => openBayar(item.nama_pengirim)} role="button">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-text-primary">{item.nama_pengirim}</span>
+                      <span className="text-xs font-bold bg-surface-elevated text-text-secondary px-2.5 py-1 rounded-full">{item.nama_pengirim}</span>
                       {lunas && <span className="text-xs bg-melon-500/15 text-melon-400 px-2 py-0.5 rounded-full font-bold">✓ Lunas</span>}
-                      <span className="text-xs text-text-muted bg-surface-elevated px-2 py-0.5 rounded-full">
-                        {formatTanggal(item.tanggal)}
-                      </span>
+                      <span className="text-xs text-text-muted">{formatTanggal(item.tanggal)}</span>
                     </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-melon-400 font-medium">{formatKg(item.kg)}</span>
-                      <span className="text-text-secondary">{formatRupiah(item.harga)}</span>
+                    <div className="flex items-center gap-4 text-sm mt-1">
+                      <span className="text-text-primary font-medium">{formatKg(item.kg)}</span>
+                      <span className="text-melon-400 font-bold">{formatRupiah(item.harga)}</span>
                     </div>
-                    {harga > 0 && (
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-xs text-melon-400">Dibayar: {formatRupiah(dibayar)}</span>
-                        {!lunas && <span className="text-xs text-amber-400">Sisa: {formatRupiah(sisa)}</span>}
-                      </div>
+                    {!lunas && (
+                      <p className="text-xs text-amber-400 mt-1">Sisa: {formatRupiah(sisa)}</p>
                     )}
-                    {item.gambar && item.gambar.length > 0 && (
-                      <div className="flex gap-2 mt-3 overflow-x-auto pb-1 -mx-1 px-1">
-                        {item.gambar.map((img, idx) => (
-                          <div key={idx} className="relative w-14 h-14 rounded-lg overflow-hidden border border-border/60 flex-shrink-0 cursor-pointer hover:opacity-90 active:scale-95 transition-all" onClick={() => setPreviewImage(img)}>
-                            <img src={img} alt="" className="w-full h-full object-cover" />
-                          </div>
+                    {item.gambar?.length > 0 && (
+                      <div className="flex gap-2 mt-3 overflow-x-auto pb-2" onClick={e => e.stopPropagation()}>
+                        {item.gambar.map((g, i) => (
+                          <img key={i} src={g} alt={`Nota ${i+1}`} className="h-16 w-16 object-cover rounded-lg border border-border cursor-pointer hover:opacity-80" onClick={() => setPreviewImage(g)} />
                         ))}
                       </div>
                     )}
                   </div>
                   <div className="flex gap-1">
+                    <button onClick={() => openBayar(item.nama_pengirim)} className="p-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar">💳</button>
                     <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors">✏️</button>
                     <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg hover:bg-watermelon-500/10 text-text-muted hover:text-watermelon-400 transition-colors">🗑️</button>
                   </div>
@@ -518,8 +437,16 @@ export default function BarangMasuk() {
         </div>
       )}
 
-      {/* Form Modal */}
-      <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editItem ? 'Edit Barang Masuk' : 'Tambah Barang Masuk'}>
+      {/* Modal Image Preview */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/90 p-4" onClick={() => setPreviewImage(null)}>
+          <img src={previewImage} alt="Preview" className="max-w-full max-h-full rounded-lg" />
+          <button className="absolute top-4 right-4 bg-surface p-2 rounded-full text-text-primary">✕</button>
+        </div>
+      )}
+
+      {/* Modal Edit/Create */}
+      <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editItem ? 'Edit Data' : 'Catat Stok Masuk'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm text-text-secondary mb-1 block">Tanggal</label>
@@ -527,117 +454,111 @@ export default function BarangMasuk() {
               className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
           </div>
           <div>
-            <label className="text-sm text-text-secondary mb-1 block">Berat (kg)</label>
-            <NumberInput value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value })}
-              allowDecimals={true} suffix="kg" placeholder="Contoh: 500" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
-          </div>
-          <div>
-            <label className="text-sm text-text-secondary mb-1 block">Harga Total</label>
-            <CurrencyInput value={form.harga} onChange={(e) => setForm({ ...form, harga: e.target.value })}
-              placeholder="Contoh: 2.500.000" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
-          </div>
-          <div>
             <label className="text-sm text-text-secondary mb-1 block">Nama Pengirim</label>
             <SearchableSelect
+              options={pengirimList}
               value={form.nama_pengirim}
               onChange={(val) => setForm({ ...form, nama_pengirim: val })}
-              options={pengirimList}
-              placeholder="Cari atau tambah pengirim..."
-              required
+              placeholder="Pilih atau ketik nama pengirim baru"
             />
+          </div>
+          <div>
+            <label className="text-sm text-text-secondary mb-1 block">KG Masuk</label>
+            <NumberInput value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value })}
+              allowDecimals={true} suffix="kg" placeholder="Contoh: 1500" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
+          </div>
+          <div>
+            <label className="text-sm text-text-secondary mb-1 block">Harga Modal (Total)</label>
+            <CurrencyInput value={form.harga} onChange={(e) => setForm({ ...form, harga: e.target.value })}
+              placeholder="Contoh: 7.500.000" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
           </div>
           {!editItem && (
             <div>
-              <label className="text-sm text-text-secondary mb-1 block">Sudah Dibayar <span className="text-text-muted">(opsional)</span></label>
+              <label className="text-sm text-text-secondary mb-1 block">Sudah Dibayar (Uang Muka)</label>
               <CurrencyInput value={form.sudah_dibayar} onChange={(e) => setForm({ ...form, sudah_dibayar: e.target.value })}
-                placeholder="0 jika belum bayar" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" />
+                placeholder="Kosongkan jika belum ada DP" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" />
             </div>
           )}
+          
+          {/* Image Upload */}
           <div>
-            <label className="text-sm text-text-secondary mb-1.5 block font-medium">Foto Barang (Maks 5)</label>
-            <div className="grid grid-cols-5 gap-2 mb-2">
-              {form.gambar && form.gambar.map((img, idx) => (
-                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-border bg-surface-elevated">
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(idx)}
-                    className="absolute top-1 right-1 bg-black/75 hover:bg-watermelon-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs transition-colors"
-                  >
-                    &times;
-                  </button>
-                </div>
-              ))}
-              {(!form.gambar || form.gambar.length < 5) && (
-                <label className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-surface-elevated hover:border-melon-500 transition-colors">
-                  {compressing ? (
-                    <span className="text-[10px] text-text-muted animate-pulse text-center px-1">Membaca...</span>
-                  ) : (
-                    <>
-                      <span className="text-lg">📸</span>
-                      <span className="text-[10px] text-text-muted mt-0.5">Tambah</span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/png, image/jpeg, image/jpg"
-                    onChange={handleImageChange}
-                    className="hidden"
-                    disabled={compressing}
-                  />
-                </label>
-              )}
-            </div>
-            <p className="text-[10px] text-text-muted leading-tight">Format: JPG, PNG. Maks 500KB per gambar (akan otomatis dikompres).</p>
+            <label className="text-sm text-text-secondary mb-1 block">Foto Nota/Barang (Maks 5)</label>
+            <input 
+              type="file" 
+              accept="image/jpeg, image/png, image/webp" 
+              multiple 
+              onChange={handleImageChange}
+              disabled={compressing || (form.gambar || []).length >= 5}
+              className="w-full text-sm text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-melon-500/10 file:text-melon-400 hover:file:bg-melon-500/20"
+            />
+            {compressing && <p className="text-xs text-melon-400 mt-2">Sedang memproses gambar...</p>}
+            
+            {(form.gambar || []).length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {form.gambar.map((g, i) => (
+                  <div key={i} className="relative group">
+                    <img src={g} alt="preview" className="h-16 w-16 object-cover rounded-lg border border-border" />
+                    <button type="button" onClick={() => removeImage(i)}
+                      className="absolute -top-2 -right-2 bg-watermelon-500 text-white rounded-full p-1 w-5 h-5 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <button type="submit" disabled={saving}
+
+          <button type="submit" disabled={saving || compressing}
             className="w-full bg-melon-500 hover:bg-melon-600 disabled:opacity-50 text-white py-3.5 rounded-xl font-semibold transition-all duration-200 active:scale-[0.98]">
-            {saving ? 'Menyimpan...' : editItem ? 'Simpan Perubahan' : 'Tambah Barang'}
+            {saving ? 'Menyimpan...' : editItem ? 'Simpan Perubahan' : 'Catat Stok'}
           </button>
         </form>
       </Modal>
 
-      {/* Payment Modal */}
+      {/* Pembayaran Modal */}
       <Modal isOpen={showBayar} onClose={() => { setShowBayar(false); setSelectedBM(null); setBayarData(null); }}
-        title={selectedBM ? `Pembayaran — ${selectedBM}` : 'Pembayaran'}>
+        title={selectedBM ? `Tagihan — ${selectedBM}` : 'Pembayaran'}>
         {bayarData && (
           <div className="space-y-4">
             {/* Summary */}
             <div className="bg-surface-elevated rounded-xl p-4">
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-text-muted">Total Tagihan</span>
-                <span className="text-text-primary font-medium">{formatRupiah(bayarData.total_harga)}</span>
+                <span className="text-text-primary font-medium">{formatRupiah(bayarData.total_hutang)}</span>
               </div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-text-muted">Total Dibayar</span>
+                <span className="text-text-muted">Telah Dibayar</span>
                 <span className="text-melon-400 font-medium">{formatRupiah(bayarData.total_dibayar)}</span>
               </div>
               <div className="flex justify-between text-sm font-bold border-t border-border pt-2 mt-2">
                 <span className="text-text-secondary">Sisa Tagihan</span>
-                <span className={bayarData.sisa <= 0 ? 'text-melon-400' : 'text-amber-400'}>{formatRupiah(bayarData.sisa)}</span>
+                <span className={bayarData.sisa_tagihan <= 0 ? 'text-melon-400' : 'text-amber-400'}>{formatRupiah(bayarData.sisa_tagihan)}</span>
               </div>
             </div>
 
-            {/* Payment history */}
-            {bayarData.pembayaran?.length > 0 && (
+            {/* List of unpaid items (FIFO order) */}
+            {bayarData.rincian_belum_lunas?.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold text-text-secondary mb-2">Riwayat Cicilan</h4>
+                <h4 className="text-sm font-semibold text-text-secondary mb-2">Belum Lunas (FIFO)</h4>
                 <div className="space-y-2">
-                  {bayarData.pembayaran.map((p, idx) => (
-                    <div key={idx} className="flex justify-between items-center bg-surface-card rounded-xl px-4 py-3 border border-border">
-                      <span className="text-sm text-text-muted">{formatTanggal(p.tanggal_bayar)}</span>
-                      <span className="text-sm text-melon-400 font-medium">{formatRupiah(p.jumlah_bayar)}</span>
+                  {bayarData.rincian_belum_lunas.map((item) => (
+                    <div key={item.id} className="bg-surface-card rounded-xl px-4 py-3 border border-border flex justify-between items-center">
+                      <div>
+                        <p className="text-xs text-text-muted">{formatTanggal(item.tanggal)}</p>
+                        <p className="text-sm font-medium text-text-primary">{formatKg(item.kg)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-text-muted">{formatRupiah(item.harga)}</p>
+                        <p className="text-sm font-bold text-amber-400">Sisa: {formatRupiah(item.sisa_bayar)}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Add payment form */}
-            {bayarData.sisa > 0 && (
+            {/* Payment form */}
+            {bayarData.sisa_tagihan > 0 && (
               <form onSubmit={handleBayar} className="space-y-3 border-t border-border pt-4">
-                <h4 className="text-sm font-semibold text-text-secondary">Tambah Cicilan</h4>
+                <h4 className="text-sm font-semibold text-text-secondary">Catat Pembayaran</h4>
                 <div>
                   <label className="text-xs text-text-muted mb-1 block">Tanggal Bayar</label>
                   <input type="date" value={bayarForm.tanggal_bayar} onChange={(e) => setBayarForm({ ...bayarForm, tanggal_bayar: e.target.value })}
@@ -646,26 +567,18 @@ export default function BarangMasuk() {
                 <div>
                   <label className="text-xs text-text-muted mb-1 block">Jumlah Bayar</label>
                   <CurrencyInput value={bayarForm.jumlah_bayar} onChange={(e) => setBayarForm({ ...bayarForm, jumlah_bayar: e.target.value })}
-                    placeholder={`Maks: ${formatRupiah(bayarData.sisa)}`} className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-sm text-text-primary" required />
+                    placeholder={`Maks: ${formatRupiah(bayarData.sisa_tagihan)}`} className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-sm text-text-primary" required />
                 </div>
                 <button type="submit" disabled={savingBayar}
                   className="w-full bg-melon-500 hover:bg-melon-600 disabled:opacity-50 text-white py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98]">
-                  {savingBayar ? 'Menyimpan...' : 'Catat Pembayaran'}
+                  {savingBayar ? 'Menyimpan...' : 'Bayar ke Pengirim'}
                 </button>
               </form>
             )}
           </div>
         )}
-        {!bayarData && <div className="py-8 text-center text-text-muted">Memuat data...</div>}
+        {!bayarData && <div className="py-8 text-center text-text-muted">Memuat data tagihan...</div>}
       </Modal>
-
-      {/* Fullscreen Image Preview Modal */}
-      {previewImage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 cursor-zoom-out" onClick={() => setPreviewImage(null)}>
-          <button className="absolute top-6 right-6 text-white/70 hover:text-white text-3xl font-light p-2 hover:bg-white/10 rounded-full transition-colors leading-none" onClick={() => setPreviewImage(null)}>&times;</button>
-          <img src={previewImage} alt="Preview" className="max-w-full max-h-[90vh] rounded-xl object-contain shadow-2xl border border-white/10 animate-scale-up" />
-        </div>
-      )}
     </div>
   );
 }

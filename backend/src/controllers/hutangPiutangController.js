@@ -122,4 +122,103 @@ const restore = async (req, res) => {
   }
 };
 
-module.exports = { getAll, create, update, remove, restore };
+// GET /api/hutang-piutang/pelanggan/:nama/bayar
+const getPembayaranPelanggan = async (req, res) => {
+  try {
+    const { nama } = req.params;
+
+    const summaryQuery = `
+      SELECT 
+        COALESCE(SUM(hp.jumlah_total), 0) AS total_piutang,
+        (
+          SELECT COALESCE(SUM(p.jumlah_bayar), 0)
+          FROM pembayaran p
+          JOIN hutang_piutang hp2 ON p.hutang_piutang_id = hp2.id
+          WHERE hp2.nama = $1 AND hp2.tipe = 'piutang' AND hp2.deleted_at IS NULL
+        ) AS total_dibayar
+      FROM hutang_piutang hp
+      WHERE hp.nama = $1 AND hp.tipe = 'piutang' AND hp.deleted_at IS NULL
+    `;
+    const summary = await pool.query(summaryQuery, [nama]);
+    
+    // History
+    const historyQuery = `
+      SELECT p.tanggal_bayar, SUM(p.jumlah_bayar) AS jumlah_bayar, MAX(p.created_at) as created_at
+      FROM pembayaran p
+      JOIN hutang_piutang hp ON p.hutang_piutang_id = hp.id
+      WHERE hp.nama = $1 AND hp.tipe = 'piutang' AND hp.deleted_at IS NULL
+      GROUP BY p.tanggal_bayar, DATE_TRUNC('minute', p.created_at)
+      ORDER BY p.tanggal_bayar DESC, created_at DESC
+    `;
+    const payments = await pool.query(historyQuery, [nama]);
+
+    const totalPiutang = parseFloat(summary.rows[0].total_piutang);
+    const totalDibayar = parseFloat(summary.rows[0].total_dibayar);
+
+    res.json({
+      nama_pelanggan: nama,
+      pembayaran: payments.rows,
+      hutang_piutang: { jumlah_total: totalPiutang }, // For compatibility with frontend modal
+      total_dibayar: totalDibayar,
+      sisa: totalPiutang - totalDibayar,
+    });
+  } catch (err) {
+    console.error('Error getPembayaranPelanggan:', err);
+    res.status(500).json({ error: 'Gagal mengambil data pembayaran' });
+  }
+};
+
+// POST /api/hutang-piutang/pelanggan/:nama/bayar
+const addPembayaranPelanggan = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { nama } = req.params;
+    const { tanggal_bayar, jumlah_bayar } = req.body;
+    let paymentLeft = parseFloat(jumlah_bayar);
+
+    if (!tanggal_bayar || !jumlah_bayar || paymentLeft <= 0) {
+      return res.status(400).json({ error: 'Data pembayaran tidak valid' });
+    }
+
+    await client.query('BEGIN');
+
+    // Get all unpaid for this sender (FIFO)
+    const unpaidQuery = `
+      SELECT hp.id, hp.jumlah_total, COALESCE(SUM(p.jumlah_bayar), 0) AS total_dibayar
+      FROM hutang_piutang hp
+      LEFT JOIN pembayaran p ON p.hutang_piutang_id = hp.id
+      WHERE hp.nama = $1 AND hp.tipe = 'piutang' AND hp.deleted_at IS NULL
+      GROUP BY hp.id
+      HAVING hp.jumlah_total - COALESCE(SUM(p.jumlah_bayar), 0) > 0
+      ORDER BY hp.tanggal ASC, hp.created_at ASC
+    `;
+    const unpaid = await client.query(unpaidQuery, [nama]);
+
+    for (const item of unpaid.rows) {
+      if (paymentLeft <= 0) break;
+      const sisaTagihan = parseFloat(item.jumlah_total) - parseFloat(item.total_dibayar);
+      const toPay = Math.min(sisaTagihan, paymentLeft);
+      
+      await client.query(
+        'INSERT INTO pembayaran (hutang_piutang_id, tanggal_bayar, jumlah_bayar) VALUES ($1, $2, $3)',
+        [item.id, tanggal_bayar, toPay]
+      );
+      paymentLeft -= toPay;
+    }
+
+    if (paymentLeft > 0) {
+      throw new Error(`Uang berlebih Rp ${paymentLeft.toLocaleString('id-ID')}, tidak ada tagihan untuk dilunasi.`);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ message: 'Pembayaran berhasil dicatat' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error addPembayaranPelanggan:', err);
+    res.status(400).json({ error: err.message || 'Gagal menambah pembayaran' });
+  } finally {
+    client.release();
+  }
+};
+
+module.exports = { getAll, create, update, remove, restore, getPembayaranPelanggan, addPembayaranPelanggan };

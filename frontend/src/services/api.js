@@ -34,6 +34,8 @@ export const restoreHutangPiutang = (id) => api.put(`/hutang-piutang/${id}/resto
 // Pembayaran
 export const createPembayaran = (data) => api.post('/pembayaran', data);
 export const getPembayaranByHP = (hutangPiutangId) => api.get(`/pembayaran/${hutangPiutangId}`);
+export const getPembayaranPelanggan = (nama) => api.get(`/hutang-piutang/pelanggan/${encodeURIComponent(nama)}/bayar`);
+export const addPembayaranPelanggan = (nama, data) => api.post(`/hutang-piutang/pelanggan/${encodeURIComponent(nama)}/bayar`, data);
 
 // Laporan
 export const getLaporan = (params) => api.get('/laporan', { params });

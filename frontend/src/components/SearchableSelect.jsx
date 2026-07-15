@@ -10,7 +10,7 @@ import { useState, useEffect, useRef } from 'react';
  * - placeholder: input placeholder
  * - required: input required
  */
-export default function SearchableSelect({ value, onChange, options = [], placeholder = '', required = false }) {
+export default function SearchableSelect({ value, onChange, options = [], placeholder = '', required = false, allowNew = true }) {
   const [query, setQuery] = useState(value || '');
   const [isOpen, setIsOpen] = useState(false);
   const [filtered, setFiltered] = useState([]);
@@ -81,7 +81,7 @@ export default function SearchableSelect({ value, onChange, options = [], placeh
     }
   };
 
-  const showNewBadge = query.trim() && !options.some(opt => opt.toLowerCase() === query.toLowerCase());
+  const showNewBadge = allowNew && query.trim() && !options.some(opt => opt.toLowerCase() === query.toLowerCase());
 
   return (
     <div ref={wrapperRef} className="relative">

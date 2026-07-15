@@ -27,6 +27,8 @@ router.put('/penjualan/:id/restore', penjualanController.restore);
 
 // Hutang Piutang
 router.get('/hutang-piutang', hutangPiutangController.getAll);
+router.get('/hutang-piutang/pelanggan/:nama/bayar', hutangPiutangController.getPembayaranPelanggan);
+router.post('/hutang-piutang/pelanggan/:nama/bayar', hutangPiutangController.addPembayaranPelanggan);
 router.post('/hutang-piutang', hutangPiutangController.create);
 router.put('/hutang-piutang/:id', hutangPiutangController.update);
 router.delete('/hutang-piutang/:id', hutangPiutangController.remove);

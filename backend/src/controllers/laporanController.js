@@ -109,7 +109,8 @@ const getLaporan = async (req, res) => {
     const dibayarBM = parseFloat(pembayaranBM.rows[0].total);
 
     // Formulas from spec
-    const sisaStok = (kgBarangMasuk + kgHutang) - (kgTerjual + kgPiutang);
+    // kgPiutang is just a note, doesn't reduce stock
+    const sisaStok = (kgBarangMasuk + kgHutang) - kgTerjual;
     const omzet = uangPenjualan + jumlahPiutang;
     const modal = totalHargaBarangMasuk;
     const keuntungan = omzet - modal;
