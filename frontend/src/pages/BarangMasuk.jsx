@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getBarangMasuk, createBarangMasuk, updateBarangMasuk, deleteBarangMasuk, getPengirimList, getPembayaranPengirim, addPembayaranPengirim } from '../services/api';
+import { getBarangMasuk, createBarangMasuk, updateBarangMasuk, deleteBarangMasuk, getPengirimList, getPembayaranPengirim, addPembayaranPengirim, updatePembayaranBM } from '../services/api';
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
 import { compressImage } from '../utils/imageCompressor';
 import PageHeader from '../components/PageHeader';
@@ -46,6 +46,7 @@ export default function BarangMasuk() {
   const [bayarData, setBayarData] = useState(null);
   const [bayarForm, setBayarForm] = useState({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
   const [savingBayar, setSavingBayar] = useState(false);
+  const [editPayment, setEditPayment] = useState(null); // payment being edited
 
   // Accordion state for summary detail
   const [expandedPengirim, setExpandedPengirim] = useState(null);
@@ -220,7 +221,12 @@ export default function BarangMasuk() {
     e.preventDefault();
     setSavingBayar(true);
     try {
-      await addPembayaranPengirim(selectedBM, bayarForm);
+      if (editPayment) {
+        await updatePembayaranBM(editPayment.id, bayarForm);
+        setEditPayment(null);
+      } else {
+        await addPembayaranPengirim(selectedBM, bayarForm);
+      }
       const res = await getPembayaranPengirim(selectedBM);
       setBayarData(res.data);
       setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
@@ -230,6 +236,19 @@ export default function BarangMasuk() {
     } finally {
       setSavingBayar(false);
     }
+  };
+
+  const startEditPayment = (payment) => {
+    setEditPayment(payment);
+    setBayarForm({
+      tanggal_bayar: payment.tanggal_bayar?.split('T')[0] || '',
+      jumlah_bayar: payment.jumlah_bayar,
+    });
+  };
+
+  const cancelEditPayment = () => {
+    setEditPayment(null);
+    setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
   };
 
   return (
@@ -514,7 +533,7 @@ export default function BarangMasuk() {
       </Modal>
 
       {/* Pembayaran Modal */}
-      <Modal isOpen={showBayar} onClose={() => { setShowBayar(false); setSelectedBM(null); setBayarData(null); }}
+      <Modal isOpen={showBayar} onClose={() => { setShowBayar(false); setSelectedBM(null); setBayarData(null); setEditPayment(null); }}
         title={selectedBM ? `Tagihan — ${selectedBM}` : 'Pembayaran'}>
         {bayarData && (
           <div className="space-y-4">
@@ -555,10 +574,40 @@ export default function BarangMasuk() {
               </div>
             )}
 
+            {/* Payment history */}
+            {bayarData.pembayaran?.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-text-secondary mb-2">Riwayat Pembayaran</h4>
+                <div className="space-y-2">
+                  {bayarData.pembayaran.map((p) => (
+                    <div key={p.id} className={`flex justify-between items-center bg-surface-card rounded-xl px-4 py-3 border transition-colors ${editPayment?.id === p.id ? 'border-melon-500 bg-melon-500/5' : 'border-border'}`}>
+                      <div>
+                        <span className="text-sm text-text-muted">{formatTanggal(p.tanggal_bayar)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-melon-400 font-medium">{formatRupiah(p.jumlah_bayar)}</span>
+                        <button type="button" onClick={() => startEditPayment(p)}
+                          className="p-1 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors text-xs"
+                          title="Edit pembayaran">✏️</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Payment form */}
-            {bayarData.sisa_tagihan > 0 && (
+            {(bayarData.sisa_tagihan > 0 || editPayment) && (
               <form onSubmit={handleBayar} className="space-y-3 border-t border-border pt-4">
-                <h4 className="text-sm font-semibold text-text-secondary">Catat Pembayaran</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-text-secondary">
+                    {editPayment ? 'Edit Pembayaran' : 'Catat Pembayaran'}
+                  </h4>
+                  {editPayment && (
+                    <button type="button" onClick={cancelEditPayment}
+                      className="text-xs text-text-muted hover:text-watermelon-400 transition-colors">Batal Edit</button>
+                  )}
+                </div>
                 <div>
                   <label className="text-xs text-text-muted mb-1 block">Tanggal Bayar</label>
                   <input type="date" value={bayarForm.tanggal_bayar} onChange={(e) => setBayarForm({ ...bayarForm, tanggal_bayar: e.target.value })}
@@ -571,7 +620,7 @@ export default function BarangMasuk() {
                 </div>
                 <button type="submit" disabled={savingBayar}
                   className="w-full bg-melon-500 hover:bg-melon-600 disabled:opacity-50 text-white py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98]">
-                  {savingBayar ? 'Menyimpan...' : 'Bayar ke Pengirim'}
+                  {savingBayar ? 'Menyimpan...' : editPayment ? 'Simpan Perubahan' : 'Bayar ke Pengirim'}
                 </button>
               </form>
             )}

@@ -299,16 +299,29 @@ const getPembayaranPengirim = async (req, res) => {
     `;
     const summary = await pool.query(summaryQuery, [nama]);
     
-    // Group by timestamp block to combine split payments from the same request
+    // Individual payment records with IDs for editing
     const historyQuery = `
-      SELECT pbm.tanggal_bayar, SUM(pbm.jumlah_bayar) AS jumlah_bayar, MAX(pbm.created_at) as created_at
+      SELECT pbm.id, pbm.tanggal_bayar, pbm.jumlah_bayar, pbm.created_at
       FROM pembayaran_barang_masuk pbm
       JOIN barang_masuk bm ON pbm.barang_masuk_id = bm.id
       WHERE bm.nama_pengirim = $1 AND bm.deleted_at IS NULL
-      GROUP BY pbm.tanggal_bayar, DATE_TRUNC('minute', pbm.created_at)
-      ORDER BY pbm.tanggal_bayar DESC, created_at DESC
+      ORDER BY pbm.tanggal_bayar DESC, pbm.created_at DESC
     `;
     const payments = await pool.query(historyQuery, [nama]);
+
+    // Unpaid items (FIFO)
+    const unpaidQuery = `
+      SELECT bm.id, bm.tanggal, bm.kg, bm.harga, 
+        COALESCE(SUM(pbm.jumlah_bayar), 0) AS total_dibayar,
+        bm.harga - COALESCE(SUM(pbm.jumlah_bayar), 0) AS sisa_bayar
+      FROM barang_masuk bm
+      LEFT JOIN pembayaran_barang_masuk pbm ON pbm.barang_masuk_id = bm.id
+      WHERE bm.nama_pengirim = $1 AND bm.deleted_at IS NULL
+      GROUP BY bm.id
+      HAVING bm.harga - COALESCE(SUM(pbm.jumlah_bayar), 0) > 0
+      ORDER BY bm.tanggal ASC, bm.created_at ASC
+    `;
+    const unpaid = await pool.query(unpaidQuery, [nama]);
 
     const totalHarga = parseFloat(summary.rows[0].total_harga);
     const totalDibayar = parseFloat(summary.rows[0].total_dibayar);
@@ -316,9 +329,10 @@ const getPembayaranPengirim = async (req, res) => {
     res.json({
       nama_pengirim: nama,
       pembayaran: payments.rows,
-      total_harga: totalHarga,
+      total_hutang: totalHarga,
       total_dibayar: totalDibayar,
-      sisa: totalHarga - totalDibayar,
+      sisa_tagihan: totalHarga - totalDibayar,
+      rincian_belum_lunas: unpaid.rows,
     });
   } catch (err) {
     console.error('Error getPembayaranPengirim:', err);
@@ -326,4 +340,49 @@ const getPembayaranPengirim = async (req, res) => {
   }
 };
 
-module.exports = { getAll, create, update, remove, restore, getPengirimList, addPembayaran, getPembayaran, addPembayaranPengirim, getPembayaranPengirim };
+// PUT /api/barang-masuk/pembayaran/:paymentId — Edit a payment record
+const updatePembayaran = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const { tanggal_bayar, jumlah_bayar } = req.body;
+
+    if (!tanggal_bayar || !jumlah_bayar) {
+      return res.status(400).json({ error: 'Tanggal dan jumlah bayar wajib diisi' });
+    }
+
+    // Get current payment
+    const current = await pool.query('SELECT * FROM pembayaran_barang_masuk WHERE id = $1', [paymentId]);
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: 'Data pembayaran tidak ditemukan' });
+    }
+
+    const bmId = current.rows[0].barang_masuk_id;
+
+    // Get barang masuk harga
+    const bm = await pool.query('SELECT harga FROM barang_masuk WHERE id = $1', [bmId]);
+    const harga = parseFloat(bm.rows[0].harga);
+
+    // Get total paid for this BM excluding current payment
+    const otherPaid = await pool.query(
+      'SELECT COALESCE(SUM(jumlah_bayar), 0) AS total FROM pembayaran_barang_masuk WHERE barang_masuk_id = $1 AND id != $2',
+      [bmId, paymentId]
+    );
+    const otherTotal = parseFloat(otherPaid.rows[0].total);
+
+    if (otherTotal + parseFloat(jumlah_bayar) > harga) {
+      return res.status(400).json({ error: `Jumlah melebihi sisa tagihan` });
+    }
+
+    const result = await pool.query(
+      'UPDATE pembayaran_barang_masuk SET tanggal_bayar = $1, jumlah_bayar = $2 WHERE id = $3 RETURNING *',
+      [tanggal_bayar, jumlah_bayar, paymentId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updatePembayaran:', err);
+    res.status(500).json({ error: 'Gagal mengupdate pembayaran' });
+  }
+};
+
+module.exports = { getAll, create, update, remove, restore, getPengirimList, addPembayaran, getPembayaran, addPembayaranPengirim, getPembayaranPengirim, updatePembayaran };

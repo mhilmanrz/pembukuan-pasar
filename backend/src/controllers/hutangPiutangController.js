@@ -141,14 +141,13 @@ const getPembayaranPelanggan = async (req, res) => {
     `;
     const summary = await pool.query(summaryQuery, [nama]);
     
-    // History
+    // Individual payment records with IDs for editing
     const historyQuery = `
-      SELECT p.tanggal_bayar, SUM(p.jumlah_bayar) AS jumlah_bayar, MAX(p.created_at) as created_at
+      SELECT p.id, p.tanggal_bayar, p.jumlah_bayar, p.created_at
       FROM pembayaran p
       JOIN hutang_piutang hp ON p.hutang_piutang_id = hp.id
       WHERE hp.nama = $1 AND hp.tipe = 'piutang' AND hp.deleted_at IS NULL
-      GROUP BY p.tanggal_bayar, DATE_TRUNC('minute', p.created_at)
-      ORDER BY p.tanggal_bayar DESC, created_at DESC
+      ORDER BY p.tanggal_bayar DESC, p.created_at DESC
     `;
     const payments = await pool.query(historyQuery, [nama]);
 
@@ -158,7 +157,7 @@ const getPembayaranPelanggan = async (req, res) => {
     res.json({
       nama_pelanggan: nama,
       pembayaran: payments.rows,
-      hutang_piutang: { jumlah_total: totalPiutang }, // For compatibility with frontend modal
+      hutang_piutang: { jumlah_total: totalPiutang },
       total_dibayar: totalDibayar,
       sisa: totalPiutang - totalDibayar,
     });
@@ -221,4 +220,47 @@ const addPembayaranPelanggan = async (req, res) => {
   }
 };
 
-module.exports = { getAll, create, update, remove, restore, getPembayaranPelanggan, addPembayaranPelanggan };
+// PUT /api/hutang-piutang/pembayaran/:paymentId — Edit a piutang payment record
+const updatePembayaranPiutang = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const { tanggal_bayar, jumlah_bayar } = req.body;
+
+    if (!tanggal_bayar || !jumlah_bayar) {
+      return res.status(400).json({ error: 'Tanggal dan jumlah bayar wajib diisi' });
+    }
+
+    const current = await pool.query('SELECT * FROM pembayaran WHERE id = $1', [paymentId]);
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: 'Data pembayaran tidak ditemukan' });
+    }
+
+    const hpId = current.rows[0].hutang_piutang_id;
+
+    const hp = await pool.query('SELECT jumlah_total FROM hutang_piutang WHERE id = $1', [hpId]);
+    const jumlahTotal = parseFloat(hp.rows[0].jumlah_total);
+
+    const otherPaid = await pool.query(
+      'SELECT COALESCE(SUM(jumlah_bayar), 0) AS total FROM pembayaran WHERE hutang_piutang_id = $1 AND id != $2',
+      [hpId, paymentId]
+    );
+    const otherTotal = parseFloat(otherPaid.rows[0].total);
+
+    if (otherTotal + parseFloat(jumlah_bayar) > jumlahTotal) {
+      return res.status(400).json({ error: 'Jumlah melebihi sisa tagihan' });
+    }
+
+    const result = await pool.query(
+      'UPDATE pembayaran SET tanggal_bayar = $1, jumlah_bayar = $2 WHERE id = $3 RETURNING *',
+      [tanggal_bayar, jumlah_bayar, paymentId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updatePembayaranPiutang:', err);
+    res.status(500).json({ error: 'Gagal mengupdate pembayaran' });
+  }
+};
+
+module.exports = { getAll, create, update, remove, restore, getPembayaranPelanggan, addPembayaranPelanggan, updatePembayaranPiutang };
+
