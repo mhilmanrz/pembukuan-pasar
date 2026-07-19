@@ -28,7 +28,9 @@ export default function CurrencyInput({ value, onChange, prefix = 'Rp', classNam
 
   // Sync display when value prop changes externally
   useEffect(() => {
-    const raw = String(value || '').replace(/[^\d]/g, '');
+    // Handle PostgreSQL NUMERIC values like "39580000.00" — strip decimal portion
+    const num = parseFloat(value);
+    const raw = (!isNaN(num) ? Math.round(num).toString() : String(value || '')).replace(/[^\d]/g, '');
     setDisplay(formatNumber(raw));
   }, [value]);
 

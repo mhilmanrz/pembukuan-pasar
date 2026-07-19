@@ -7,7 +7,7 @@ const getAll = async (req, res) => {
     let query = `
       SELECT hp.*, 
         COALESCE(SUM(p.jumlah_bayar), 0) AS total_dibayar,
-        hp.jumlah_total - COALESCE(SUM(p.jumlah_bayar), 0) AS sisa
+        hp.jumlah_total - COALESCE(SUM(p.jumlah_bayar), 0) AS sisa_tagihan
       FROM hutang_piutang hp
       LEFT JOIN pembayaran p ON p.hutang_piutang_id = hp.id
     `;
@@ -59,6 +59,9 @@ const create = async (req, res) => {
     if (!['hutang', 'piutang'].includes(tipe)) {
       return res.status(400).json({ error: 'Tipe harus hutang atau piutang' });
     }
+    if (kg && parseFloat(kg) < 0) return res.status(400).json({ error: 'Kg tidak boleh negatif' });
+    if (parseFloat(jumlah_total) < 0) return res.status(400).json({ error: 'Jumlah total tidak boleh negatif' });
+    if (nama.length > 100) return res.status(400).json({ error: 'Nama maksimal 100 karakter' });
     const result = await pool.query(
       'INSERT INTO hutang_piutang (tipe, tanggal, nama, kg, jumlah_total, keterangan) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [tipe, tanggal, nama, kg || null, jumlah_total, keterangan || null]
@@ -78,6 +81,9 @@ const update = async (req, res) => {
     if (tipe && !['hutang', 'piutang'].includes(tipe)) {
       return res.status(400).json({ error: 'Tipe harus hutang atau piutang' });
     }
+    if (kg !== undefined && kg !== null && parseFloat(kg) < 0) return res.status(400).json({ error: 'Kg tidak boleh negatif' });
+    if (jumlah_total !== undefined && parseFloat(jumlah_total) < 0) return res.status(400).json({ error: 'Jumlah total tidak boleh negatif' });
+    if (nama && nama.length > 100) return res.status(400).json({ error: 'Nama maksimal 100 karakter' });
     const result = await pool.query(
       'UPDATE hutang_piutang SET tipe=$1, tanggal=$2, nama=$3, kg=$4, jumlah_total=$5, keterangan=$6 WHERE id=$7 RETURNING *',
       [tipe, tanggal, nama, kg || null, jumlah_total, keterangan || null, id]
@@ -159,7 +165,7 @@ const getPembayaranPelanggan = async (req, res) => {
       pembayaran: payments.rows,
       hutang_piutang: { jumlah_total: totalPiutang },
       total_dibayar: totalDibayar,
-      sisa: totalPiutang - totalDibayar,
+      sisa_tagihan: totalPiutang - totalDibayar,
     });
   } catch (err) {
     console.error('Error getPembayaranPelanggan:', err);

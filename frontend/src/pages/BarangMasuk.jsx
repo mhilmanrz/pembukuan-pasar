@@ -1,33 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getBarangMasuk, createBarangMasuk, updateBarangMasuk, deleteBarangMasuk, getPengirimList, getPembayaranPengirim, addPembayaranPengirim, updatePembayaranBM } from '../services/api';
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
+import { getDateParams } from '../utils/dateHelper';
 import { compressImage } from '../utils/imageCompressor';
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
 import SearchableSelect from '../components/SearchableSelect';
 import CurrencyInput from '../components/CurrencyInput';
 import NumberInput from '../components/NumberInput';
-
-// Helper to get date range params from filter
-function getDateParams(filter, dari, sampai) {
-  const now = new Date();
-  const today = todayStr();
-  switch (filter) {
-    case 'hari-ini':
-      return { dari: today, sampai: today };
-    case 'minggu-ini': {
-      const start = new Date(now);
-      start.setDate(now.getDate() - now.getDay());
-      return { dari: start.toISOString().split('T')[0], sampai: today };
-    }
-    case 'bulan-ini':
-      return { dari: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, sampai: today };
-    case 'custom':
-      return { dari, sampai };
-    default:
-      return {};
-  }
-}
 
 export default function BarangMasuk() {
   const [items, setItems] = useState([]);

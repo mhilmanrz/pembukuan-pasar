@@ -1,31 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getPenjualan, createPenjualan, updatePenjualan, deletePenjualan } from '../services/api';
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
+import { getDateParams } from '../utils/dateHelper';
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
 import CurrencyInput from '../components/CurrencyInput';
 import NumberInput from '../components/NumberInput';
-
-// Helper to get date range params from filter
-function getDateParams(filter, dari, sampai) {
-  const now = new Date();
-  const today = todayStr();
-  switch (filter) {
-    case 'hari-ini':
-      return { dari: today, sampai: today };
-    case 'minggu-ini': {
-      const start = new Date(now);
-      start.setDate(now.getDate() - now.getDay());
-      return { dari: start.toISOString().split('T')[0], sampai: today };
-    }
-    case 'bulan-ini':
-      return { dari: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, sampai: today };
-    case 'custom':
-      return { dari, sampai };
-    default:
-      return {};
-  }
-}
 
 export default function Penjualan() {
   const [items, setItems] = useState([]);

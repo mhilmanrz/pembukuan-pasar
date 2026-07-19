@@ -52,6 +52,9 @@ const create = async (req, res) => {
     if (!tanggal || !kg || !nama_pengirim || harga === undefined) {
       return res.status(400).json({ error: 'Semua field wajib diisi' });
     }
+    if (parseFloat(kg) <= 0) return res.status(400).json({ error: 'Kg harus lebih dari 0' });
+    if (parseFloat(harga) < 0) return res.status(400).json({ error: 'Harga tidak boleh negatif' });
+    if (nama_pengirim.length > 100) return res.status(400).json({ error: 'Nama pengirim maksimal 100 karakter' });
 
     const client = await pool.connect();
     try {
@@ -99,6 +102,11 @@ const update = async (req, res) => {
   try {
     const { id } = req.params;
     const { tanggal, kg, nama_pengirim, harga, gambar } = req.body;
+    
+    if (kg !== undefined && parseFloat(kg) <= 0) return res.status(400).json({ error: 'Kg harus lebih dari 0' });
+    if (harga !== undefined && parseFloat(harga) < 0) return res.status(400).json({ error: 'Harga tidak boleh negatif' });
+    if (nama_pengirim && nama_pengirim.length > 100) return res.status(400).json({ error: 'Nama pengirim maksimal 100 karakter' });
+
     const result = await pool.query(
       'UPDATE barang_masuk SET tanggal=$1, kg=$2, nama_pengirim=$3, harga=$4, gambar=$5 WHERE id=$6 RETURNING *',
       [tanggal, kg, nama_pengirim, harga, gambar ? JSON.stringify(gambar) : '[]', id]

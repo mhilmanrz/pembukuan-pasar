@@ -3,7 +3,6 @@ const router = express.Router();
 const barangMasukController = require('../controllers/barangMasukController');
 const penjualanController = require('../controllers/penjualanController');
 const hutangPiutangController = require('../controllers/hutangPiutangController');
-const pembayaranController = require('../controllers/pembayaranController');
 const laporanController = require('../controllers/laporanController');
 
 // Barang Masuk
@@ -35,10 +34,6 @@ router.put('/hutang-piutang/pembayaran/:paymentId', hutangPiutangController.upda
 router.put('/hutang-piutang/:id', hutangPiutangController.update);
 router.delete('/hutang-piutang/:id', hutangPiutangController.remove);
 router.put('/hutang-piutang/:id/restore', hutangPiutangController.restore);
-
-// Pembayaran
-router.post('/pembayaran', pembayaranController.create);
-router.get('/pembayaran/:hutangPiutangId', pembayaranController.getByHutangPiutang);
 
 // Laporan
 router.get('/laporan', laporanController.getLaporan);

@@ -45,6 +45,8 @@ const create = async (req, res) => {
     if (!['siang', 'malam'].includes(sesi)) {
       return res.status(400).json({ error: 'Sesi harus siang atau malam' });
     }
+    if (parseFloat(kg_terjual) <= 0) return res.status(400).json({ error: 'Kg terjual harus lebih dari 0' });
+    if (parseFloat(total_uang) < 0) return res.status(400).json({ error: 'Total uang tidak boleh negatif' });
     const result = await pool.query(
       'INSERT INTO penjualan (tanggal, sesi, kg_terjual, total_uang) VALUES ($1, $2, $3, $4) RETURNING *',
       [tanggal, sesi, kg_terjual, total_uang]
@@ -64,6 +66,8 @@ const update = async (req, res) => {
     if (sesi && !['siang', 'malam'].includes(sesi)) {
       return res.status(400).json({ error: 'Sesi harus siang atau malam' });
     }
+    if (kg_terjual !== undefined && parseFloat(kg_terjual) <= 0) return res.status(400).json({ error: 'Kg terjual harus lebih dari 0' });
+    if (total_uang !== undefined && parseFloat(total_uang) < 0) return res.status(400).json({ error: 'Total uang tidak boleh negatif' });
     const result = await pool.query(
       'UPDATE penjualan SET tanggal=$1, sesi=$2, kg_terjual=$3, total_uang=$4 WHERE id=$5 RETURNING *',
       [tanggal, sesi, kg_terjual, total_uang, id]

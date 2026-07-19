@@ -1,32 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getHutangPiutang, createHutangPiutang, updateHutangPiutang, deleteHutangPiutang, getPembayaranPelanggan, addPembayaranPelanggan, updatePembayaranPiutang } from '../services/api';
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
+import { getDateParams } from '../utils/dateHelper';
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
 import CurrencyInput from '../components/CurrencyInput';
 import NumberInput from '../components/NumberInput';
 import SearchableSelect from '../components/SearchableSelect';
-
-// Helper to get date range params from filter
-function getDateParams(filter, dari, sampai) {
-  const now = new Date();
-  const today = todayStr();
-  switch (filter) {
-    case 'hari-ini':
-      return { dari: today, sampai: today };
-    case 'minggu-ini': {
-      const start = new Date(now);
-      start.setDate(now.getDate() - now.getDay());
-      return { dari: start.toISOString().split('T')[0], sampai: today };
-    }
-    case 'bulan-ini':
-      return { dari: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, sampai: today };
-    case 'custom':
-      return { dari, sampai };
-    default:
-      return {};
-  }
-}
 
 export default function Piutang() {
   const [items, setItems] = useState([]);
@@ -93,7 +73,7 @@ export default function Piutang() {
         kg: acc.kg + (parseFloat(item.kg) || 0),
         total: acc.total + (parseFloat(item.jumlah_total) || 0),
         dibayar: acc.dibayar + (parseFloat(item.total_dibayar) || 0),
-        sisa: acc.sisa + (parseFloat(item.sisa) || 0),
+        sisa: acc.sisa + (parseFloat(item.sisa_tagihan) || 0),
       }),
       { kg: 0, total: 0, dibayar: 0, sisa: 0 }
     );
@@ -474,7 +454,7 @@ export default function Piutang() {
               </div>
               <div className="flex justify-between text-sm font-bold border-t border-border pt-2 mt-2">
                 <span className="text-text-secondary">Sisa Tagihan</span>
-                <span className={bayarData.sisa <= 0 ? 'text-orange-400' : 'text-amber-400'}>{formatRupiah(bayarData.sisa)}</span>
+                <span className={bayarData.sisa_tagihan <= 0 ? 'text-orange-400' : 'text-amber-400'}>{formatRupiah(bayarData.sisa_tagihan)}</span>
               </div>
             </div>
 
@@ -501,7 +481,7 @@ export default function Piutang() {
             )}
 
             {/* Add payment form */}
-            {(bayarData.sisa > 0 || editPayment) && (
+            {(bayarData.sisa_tagihan > 0 || editPayment) && (
               <form onSubmit={handleBayar} className="space-y-3 border-t border-border pt-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-text-secondary">
@@ -520,7 +500,7 @@ export default function Piutang() {
                 <div>
                   <label className="text-xs text-text-muted mb-1 block">Jumlah Bayar</label>
                   <CurrencyInput value={bayarForm.jumlah_bayar} onChange={(e) => setBayarForm({ ...bayarForm, jumlah_bayar: e.target.value })}
-                    placeholder={`Maks: ${formatRupiah(bayarData.sisa)}`} className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-sm text-text-primary" required />
+                    placeholder={`Maks: ${formatRupiah(bayarData.sisa_tagihan)}`} className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-sm text-text-primary" required />
                 </div>
                 <button type="submit" disabled={savingBayar}
                   className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98]">

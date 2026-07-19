@@ -50,8 +50,15 @@ export default function NumberInput({
       return;
     }
     
-    // Prevent formatting from removing a trailing comma while the user is typing it
-    const strVal = String(value);
+    // Handle PostgreSQL NUMERIC values like "6400.00" — parse properly
+    let strVal;
+    if (!allowDecimals) {
+      const num = parseFloat(value);
+      strVal = !isNaN(num) ? Math.round(num).toString() : String(value);
+    } else {
+      strVal = String(value);
+    }
+    
     const parsedDisplay = parseNumber(display);
     
     if (strVal !== parsedDisplay) {
