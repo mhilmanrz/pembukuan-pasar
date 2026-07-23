@@ -250,7 +250,7 @@ export default function BarangMasuk() {
         <SearchableSelect
           value={searchQuery}
           onChange={(val) => setSearchQuery(val)}
-          options={pengirimList}
+          options={pengirimList.map(p => p.nama)}
           placeholder="Ketik & pilih nama pengirim (kosongkan untuk tampil semua)"
           allowNew={false}
         />
@@ -340,7 +340,31 @@ export default function BarangMasuk() {
                         </div>
                         <div className="flex items-center gap-3">
                           <p className="text-sm font-bold text-text-primary">{formatRupiah(p.totalHarga)}</p>
-                          <button onClick={() => openBayar(p.nama)} className="p-2 -mr-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar Tagihan">💳</button>
+                          <div className="flex gap-1">
+                            {(() => {
+                              const pengirim = pengirimList.find(pl => pl.nama === p.nama);
+                              const hasToken = !!pengirim?.share_token;
+                              return (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (hasToken) {
+                                      const link = `${window.location.origin}/p/${pengirim.share_token}`;
+                                      navigator.clipboard.writeText(link);
+                                      alert('Link berhasil disalin:\n' + link);
+                                    } else {
+                                      alert(`Pengirim "${p.nama}" belum punya link akses.\nCoba tambahkan transaksi baru untuk pengirim ini agar token dibuat otomatis.`);
+                                    }
+                                  }} 
+                                  className={`p-2 rounded-lg transition-colors ${hasToken ? 'hover:bg-indigo-500/10 text-text-muted hover:text-indigo-400' : 'hover:bg-surface-elevated text-text-muted/40'}`}
+                                  title={hasToken ? 'Salin Link Akses Pengirim' : 'Link belum tersedia'}
+                                >
+                                  🔗
+                                </button>
+                              );
+                            })()}
+                            <button onClick={() => openBayar(p.nama)} className="p-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar Tagihan">💳</button>
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center justify-between mt-1.5">
@@ -455,7 +479,7 @@ export default function BarangMasuk() {
           <div>
             <label className="text-sm text-text-secondary mb-1 block">Nama Pengirim</label>
             <SearchableSelect
-              options={pengirimList}
+              options={pengirimList.map(p => p.nama)}
               value={form.nama_pengirim}
               onChange={(val) => setForm({ ...form, nama_pengirim: val })}
               placeholder="Pilih atau ketik nama pengirim baru"

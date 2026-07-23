@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getHutangPiutang, createHutangPiutang, updateHutangPiutang, deleteHutangPiutang, getPembayaranPelanggan, addPembayaranPelanggan, updatePembayaranPiutang } from '../services/api';
+import { getHutangPiutang, createHutangPiutang, updateHutangPiutang, deleteHutangPiutang, getPembayaranPelanggan, addPembayaranPelanggan, updatePembayaranPiutang, getPelangganList } from '../services/api';
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../utils/format';
 import { getDateParams } from '../utils/dateHelper';
 import PageHeader from '../components/PageHeader';
@@ -15,6 +15,7 @@ export default function Piutang() {
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({ tipe: 'piutang', tanggal: todayStr(), nama: '', kg: '', jumlah_total: '', keterangan: '' });
   const [saving, setSaving] = useState(false);
+  const [pelangganList, setPelangganList] = useState([]);
   
   // Filters
   const [filter, setFilter] = useState('bulan-ini');
@@ -26,7 +27,7 @@ export default function Piutang() {
   const [showBayar, setShowBayar] = useState(false);
   const [selectedHP, setSelectedHP] = useState(null);
   const [bayarData, setBayarData] = useState(null);
-  const [bayarForm, setBayarForm] = useState({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
+  const [bayarForm, setBayarForm] = useState({ tanggal_bayar: todayStr(), jumlah_bayar: '', kg_bayar: '' });
   const [savingBayar, setSavingBayar] = useState(false);
   const [editPayment, setEditPayment] = useState(null);
 
@@ -37,6 +38,19 @@ export default function Piutang() {
     if (filter === 'custom' && (!dari || !sampai)) return;
     fetchData(); 
   }, [filter, dari, sampai]);
+
+  useEffect(() => {
+    fetchPelangganList();
+  }, []);
+
+  const fetchPelangganList = async () => {
+    try {
+      const res = await getPelangganList();
+      setPelangganList(res.data);
+    } catch (err) {
+      console.error('Gagal memuat daftar pelanggan:', err);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -51,14 +65,7 @@ export default function Piutang() {
     }
   };
 
-  // Pelanggan List for Dropdown
-  const pelangganList = useMemo(() => {
-    const set = new Set();
-    items.forEach(item => {
-      if (item.nama) set.add(item.nama);
-    });
-    return Array.from(set).sort();
-  }, [items]);
+  // Pelanggan List for Dropdown handled by state now
 
   // Search filter
   const filteredItems = useMemo(() => {
@@ -91,6 +98,7 @@ export default function Piutang() {
       p.totalKg += parseFloat(item.kg) || 0;
       p.totalPiutang += parseFloat(item.jumlah_total) || 0;
       p.totalDibayar += parseFloat(item.total_dibayar) || 0;
+      p.totalKgDibayar = (p.totalKgDibayar || 0) + (parseFloat(item.total_kg_dibayar) || 0);
       p.items.push(item);
     });
     return Array.from(map.values()).sort((a, b) => b.totalPiutang - a.totalPiutang);
@@ -156,7 +164,7 @@ export default function Piutang() {
   const openBayar = async (nama) => {
     setSelectedHP(nama);
     setShowBayar(true);
-    setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
+    setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '', kg_bayar: '' });
     try {
       const res = await getPembayaranPelanggan(nama);
       setBayarData(res.data);
@@ -177,7 +185,7 @@ export default function Piutang() {
       }
       const res = await getPembayaranPelanggan(selectedHP);
       setBayarData(res.data);
-      setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
+      setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '', kg_bayar: '' });
       fetchData();
     } catch (err) {
       alert(err.response?.data?.error || 'Gagal menambah pembayaran');
@@ -191,12 +199,13 @@ export default function Piutang() {
     setBayarForm({
       tanggal_bayar: payment.tanggal_bayar?.split('T')[0] || '',
       jumlah_bayar: payment.jumlah_bayar,
+      kg_bayar: payment.kg_bayar || ''
     });
   };
 
   const cancelEditPayment = () => {
     setEditPayment(null);
-    setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
+    setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '', kg_bayar: '' });
   };
 
   return (
@@ -218,7 +227,7 @@ export default function Piutang() {
         <SearchableSelect
           value={searchQuery}
           onChange={(val) => setSearchQuery(val)}
-          options={pelangganList}
+          options={pelangganList.map(p => p.nama)}
           placeholder="Ketik & pilih pelanggan (kosongkan untuk tampil semua)"
           allowNew={false}
         />
@@ -308,12 +317,36 @@ export default function Piutang() {
                         </div>
                         <div className="flex items-center gap-3">
                           <p className="text-sm font-bold text-text-primary">{formatRupiah(p.totalPiutang)}</p>
-                          <button onClick={() => openBayar(p.nama)} className="p-2 -mr-2 rounded-lg hover:bg-orange-500/10 text-text-muted hover:text-orange-400 transition-colors" title="Bayar Tagihan">💳</button>
+                          <div className="flex gap-1">
+                            {(() => {
+                              const pelanggan = pelangganList.find(pl => pl.nama === p.nama);
+                              const hasToken = !!pelanggan?.share_token;
+                              return (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (hasToken) {
+                                      const link = `${window.location.origin}/u/${pelanggan.share_token}`;
+                                      navigator.clipboard.writeText(link);
+                                      alert('Link berhasil disalin:\n' + link);
+                                    } else {
+                                      alert(`Pelanggan "${p.nama}" belum punya link akses.\nCoba tambahkan transaksi baru untuk pelanggan ini agar token dibuat otomatis.`);
+                                    }
+                                  }} 
+                                  className={`p-2 rounded-lg transition-colors ${hasToken ? 'hover:bg-indigo-500/10 text-text-muted hover:text-indigo-400' : 'hover:bg-surface-elevated text-text-muted/40'}`}
+                                  title={hasToken ? 'Salin Link Akses Pelanggan' : 'Link belum tersedia'}
+                                >
+                                  🔗
+                                </button>
+                              );
+                            })()}
+                            <button onClick={() => openBayar(p.nama)} className="p-2 rounded-lg hover:bg-orange-500/10 text-text-muted hover:text-orange-400 transition-colors" title="Bayar Tagihan">💳</button>
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center justify-between mt-1.5">
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-orange-400">✓ Dibayar: {formatRupiah(p.totalDibayar)}</span>
+                          <span className="text-xs text-orange-400">✓ Dibayar: {formatRupiah(p.totalDibayar)} {p.totalKgDibayar > 0 ? `(${formatKg(p.totalKgDibayar)})` : ''}</span>
                           {!lunas && <span className="text-xs text-amber-400">⏳ Sisa: {formatRupiah(sisa)}</span>}
                           {lunas && <span className="text-xs text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full font-bold">Lunas</span>}
                         </div>
@@ -412,11 +445,16 @@ export default function Piutang() {
           </div>
           <div>
             <label className="text-sm text-text-secondary mb-1 block">Nama Pelanggan</label>
-            <input type="text" value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })}
-              placeholder="Contoh: Toko Buah Segar" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" required />
+            <SearchableSelect 
+              options={pelangganList.map(p => p.nama)}
+              value={form.nama} 
+              onChange={(val) => setForm({ ...form, nama: val })}
+              placeholder="Pilih atau ketik nama pelanggan baru" 
+              required 
+            />
           </div>
           <div>
-            <label className="text-sm text-text-secondary mb-1 block">KG (opsional)</label>
+            <label className="text-sm text-text-secondary mb-1 block">Total Muatan/Berat (Opsional)</label>
             <NumberInput value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value })}
               allowDecimals={true} suffix="kg" placeholder="Berat semangka" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" />
           </div>
@@ -446,11 +484,11 @@ export default function Piutang() {
             <div className="bg-surface-elevated rounded-xl p-4">
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-text-muted">Total Tagihan</span>
-                <span className="text-text-primary font-medium">{formatRupiah(bayarData.hutang_piutang?.jumlah_total)}</span>
+                <span className="text-text-primary font-medium">{formatRupiah(bayarData.hutang_piutang?.jumlah_total)} {bayarData.hutang_piutang?.kg ? `(${formatKg(bayarData.hutang_piutang?.kg)})` : ''}</span>
               </div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-text-muted">Telah Dibayar</span>
-                <span className="text-orange-400 font-medium">{formatRupiah(bayarData.total_dibayar)}</span>
+                <span className="text-orange-400 font-medium">{formatRupiah(bayarData.total_dibayar)} {bayarData.total_kg_dibayar ? `(${formatKg(bayarData.total_kg_dibayar)})` : ''}</span>
               </div>
               <div className="flex justify-between text-sm font-bold border-t border-border pt-2 mt-2">
                 <span className="text-text-secondary">Sisa Tagihan</span>
@@ -470,6 +508,7 @@ export default function Piutang() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-orange-400 font-medium">{formatRupiah(p.jumlah_bayar)}</span>
+                        {p.kg_bayar && <span className="text-xs text-text-muted font-medium">({formatKg(p.kg_bayar)})</span>}
                         <button type="button" onClick={() => startEditPayment(p)}
                           className="p-1 rounded-lg hover:bg-orange-500/10 text-text-muted hover:text-orange-400 transition-colors text-xs"
                           title="Edit pembayaran">✏️</button>
@@ -501,6 +540,11 @@ export default function Piutang() {
                   <label className="text-xs text-text-muted mb-1 block">Jumlah Bayar</label>
                   <CurrencyInput value={bayarForm.jumlah_bayar} onChange={(e) => setBayarForm({ ...bayarForm, jumlah_bayar: e.target.value })}
                     placeholder={`Maks: ${formatRupiah(bayarData.sisa_tagihan)}`} className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-sm text-text-primary" required />
+                </div>
+                <div>
+                  <label className="text-xs text-text-muted mb-1 block">Muatan yg Dilunasi (Opsional)</label>
+                  <NumberInput value={bayarForm.kg_bayar} onChange={(e) => setBayarForm({ ...bayarForm, kg_bayar: e.target.value })}
+                    allowDecimals={true} suffix="kg" placeholder="Total berat untuk pembayaran ini" className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-sm text-text-primary" />
                 </div>
                 <button type="submit" disabled={savingBayar}
                   className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98]">

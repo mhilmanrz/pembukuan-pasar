@@ -1,5 +1,5 @@
 # =============================================
-# CI/CD Pipeline - Pembukuan Semangka
+# CI/CD Pipeline - Pembukuan Pasar
 # Deploy Frontend ke Netlify & Backend ke Vercel
 # Trigger: push ke branch main
 # =============================================
