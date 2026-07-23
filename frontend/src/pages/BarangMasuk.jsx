@@ -341,21 +341,28 @@ export default function BarangMasuk() {
                         <div className="flex items-center gap-3">
                           <p className="text-sm font-bold text-text-primary">{formatRupiah(p.totalHarga)}</p>
                           <div className="flex gap-1">
-                            {pengirimList.find(pl => pl.nama === p.nama)?.share_token && (
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const token = pengirimList.find(pl => pl.nama === p.nama).share_token;
-                                  const link = `${window.location.origin}/p/${token}`;
-                                  navigator.clipboard.writeText(link);
-                                  alert('Link berhasil disalin: ' + link);
-                                }} 
-                                className="p-2 rounded-lg hover:bg-indigo-500/10 text-text-muted hover:text-indigo-400 transition-colors" 
-                                title="Salin Link Akses Pengirim"
-                              >
-                                🔗
-                              </button>
-                            )}
+                            {(() => {
+                              const pengirim = pengirimList.find(pl => pl.nama === p.nama);
+                              const hasToken = !!pengirim?.share_token;
+                              return (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (hasToken) {
+                                      const link = `${window.location.origin}/p/${pengirim.share_token}`;
+                                      navigator.clipboard.writeText(link);
+                                      alert('Link berhasil disalin:\n' + link);
+                                    } else {
+                                      alert(`Pengirim "${p.nama}" belum punya link akses.\nCoba tambahkan transaksi baru untuk pengirim ini agar token dibuat otomatis.`);
+                                    }
+                                  }} 
+                                  className={`p-2 rounded-lg transition-colors ${hasToken ? 'hover:bg-indigo-500/10 text-text-muted hover:text-indigo-400' : 'hover:bg-surface-elevated text-text-muted/40'}`}
+                                  title={hasToken ? 'Salin Link Akses Pengirim' : 'Link belum tersedia'}
+                                >
+                                  🔗
+                                </button>
+                              );
+                            })()}
                             <button onClick={() => openBayar(p.nama)} className="p-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar Tagihan">💳</button>
                           </div>
                         </div>

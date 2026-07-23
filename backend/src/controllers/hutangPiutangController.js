@@ -322,6 +322,15 @@ const updatePembayaranPiutang = async (req, res) => {
 // GET /api/hutang-piutang/pelanggan
 const getPelangganList = async (req, res) => {
   try {
+    // Auto-sync: insert any pelanggan from hutang_piutang that don't exist in pelanggan table yet
+    await pool.query(`
+      INSERT INTO pelanggan (nama)
+      SELECT DISTINCT hp.nama FROM hutang_piutang hp
+      WHERE hp.tipe = 'piutang' AND hp.nama IS NOT NULL AND hp.deleted_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM pelanggan p WHERE p.nama = hp.nama)
+      ON CONFLICT (nama) DO NOTHING
+    `);
+
     const result = await pool.query(
       'SELECT id, nama, share_token, telepon FROM pelanggan ORDER BY nama ASC'
     );

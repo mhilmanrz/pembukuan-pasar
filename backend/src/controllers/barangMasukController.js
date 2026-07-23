@@ -192,6 +192,15 @@ const restore = async (req, res) => {
 // GET /api/barang-masuk/pengirim — Unique sender names for autocomplete
 const getPengirimList = async (req, res) => {
   try {
+    // Auto-sync: insert any pengirim from barang_masuk that don't exist in pengirim table yet
+    await pool.query(`
+      INSERT INTO pengirim (nama)
+      SELECT DISTINCT bm.nama_pengirim FROM barang_masuk bm
+      WHERE bm.nama_pengirim IS NOT NULL AND bm.deleted_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM pengirim p WHERE p.nama = bm.nama_pengirim)
+      ON CONFLICT (nama) DO NOTHING
+    `);
+
     const result = await pool.query(
       'SELECT id, nama, share_token, telepon FROM pengirim ORDER BY nama ASC'
     );
