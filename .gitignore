@@ -64,3 +64,6 @@ Desktop.ini
 .netlify
 coverage/
 *.tsbuildinfo
+
+.vercel
+.env*

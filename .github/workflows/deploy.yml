@@ -1,10 +1,10 @@
 # =============================================
 # CI/CD Pipeline - Pembukuan Semangka
-# Deploy Frontend ke Netlify & Backend ke Railway
+# Deploy Frontend ke Netlify & Backend ke Vercel
 # Trigger: push ke branch main
 # =============================================
 
-name: 🍉 Deploy Pembukuan Semangka
+name: Deploy Pembukuan Pasar
 
 on:
   push:
@@ -12,22 +12,25 @@ on:
 
 jobs:
   # ==========================================
-  # Job 1: Deploy Backend ke Railway
+  # Job 1: Deploy Backend ke Vercel
   # ==========================================
   deploy-backend:
-    name: Deploy Backend to Railway
+    name: Deploy Backend to Vercel
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
 
-      - name: Deploy to Railway
-        run: railway up --service ${{ secrets.RAILWAY_SERVICE_NAME }} --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      - name: Pull Vercel Environment
+        working-directory: backend
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel (Production)
+        working-directory: backend
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
 
   # ==========================================
   # Job 2: Deploy Frontend ke Netlify
