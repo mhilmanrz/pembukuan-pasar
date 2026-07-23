@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getLaporan, getGrafikPenjualan } from '../services/api';
 import { formatRupiah, formatKg, todayStr } from '../utils/format';
 import PageHeader from '../components/PageHeader';
+import { useAuth } from '../context/AuthContext';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -49,6 +50,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function Dashboard() {
+  const { logout } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('bulan-ini');
@@ -111,7 +113,21 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title="Dashboard" subtitle="Ringkasan pembukuan semangka" />
+      <PageHeader 
+        title="Dashboard" 
+        subtitle="Ringkasan pembukuan semangka" 
+        action={
+          <button
+            onClick={logout}
+            className="flex items-center justify-center w-10 h-10 rounded-xl bg-surface-card border border-border text-text-muted hover:text-watermelon-400 hover:bg-watermelon-500/10 transition-colors"
+            title="Keluar"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+          </button>
+        }
+      />
 
       {/* Filter */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-1 px-1">

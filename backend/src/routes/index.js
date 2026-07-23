@@ -1,9 +1,32 @@
 const express = require('express');
 const router = express.Router();
+const { authenticate } = require('../middleware/auth');
+const authController = require('../controllers/authController');
 const barangMasukController = require('../controllers/barangMasukController');
 const penjualanController = require('../controllers/penjualanController');
 const hutangPiutangController = require('../controllers/hutangPiutangController');
 const laporanController = require('../controllers/laporanController');
+const publicController = require('../controllers/publicController');
+
+// ──────────────────────────────────────
+// Auth (public)
+// ──────────────────────────────────────
+router.post('/auth/login', authController.login);
+
+// ──────────────────────────────────────
+// Public Share Links
+// ──────────────────────────────────────
+router.get('/public/pengirim/:token', publicController.getPengirimByToken);
+router.get('/public/pelanggan/:token', publicController.getPelangganByToken);
+
+// ──────────────────────────────────────
+// Protected routes (require login)
+// ──────────────────────────────────────
+router.use(authenticate);
+
+// Auth (protected)
+router.get('/auth/me', authController.me);
+router.put('/auth/change-password', authController.changePassword);
 
 // Barang Masuk
 router.get('/barang-masuk', barangMasukController.getAll);
@@ -27,6 +50,7 @@ router.put('/penjualan/:id/restore', penjualanController.restore);
 
 // Hutang Piutang
 router.get('/hutang-piutang', hutangPiutangController.getAll);
+router.get('/hutang-piutang/pelanggan', hutangPiutangController.getPelangganList);
 router.get('/hutang-piutang/pelanggan/:nama/bayar', hutangPiutangController.getPembayaranPelanggan);
 router.post('/hutang-piutang/pelanggan/:nama/bayar', hutangPiutangController.addPembayaranPelanggan);
 router.post('/hutang-piutang', hutangPiutangController.create);

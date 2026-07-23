@@ -250,7 +250,7 @@ export default function BarangMasuk() {
         <SearchableSelect
           value={searchQuery}
           onChange={(val) => setSearchQuery(val)}
-          options={pengirimList}
+          options={pengirimList.map(p => p.nama)}
           placeholder="Ketik & pilih nama pengirim (kosongkan untuk tampil semua)"
           allowNew={false}
         />
@@ -340,7 +340,24 @@ export default function BarangMasuk() {
                         </div>
                         <div className="flex items-center gap-3">
                           <p className="text-sm font-bold text-text-primary">{formatRupiah(p.totalHarga)}</p>
-                          <button onClick={() => openBayar(p.nama)} className="p-2 -mr-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar Tagihan">💳</button>
+                          <div className="flex gap-1">
+                            {pengirimList.find(pl => pl.nama === p.nama)?.share_token && (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const token = pengirimList.find(pl => pl.nama === p.nama).share_token;
+                                  const link = `${window.location.origin}/p/${token}`;
+                                  navigator.clipboard.writeText(link);
+                                  alert('Link berhasil disalin: ' + link);
+                                }} 
+                                className="p-2 rounded-lg hover:bg-indigo-500/10 text-text-muted hover:text-indigo-400 transition-colors" 
+                                title="Salin Link Akses Pengirim"
+                              >
+                                🔗
+                              </button>
+                            )}
+                            <button onClick={() => openBayar(p.nama)} className="p-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar Tagihan">💳</button>
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center justify-between mt-1.5">
@@ -455,7 +472,7 @@ export default function BarangMasuk() {
           <div>
             <label className="text-sm text-text-secondary mb-1 block">Nama Pengirim</label>
             <SearchableSelect
-              options={pengirimList}
+              options={pengirimList.map(p => p.nama)}
               value={form.nama_pengirim}
               onChange={(val) => setForm({ ...form, nama_pengirim: val })}
               placeholder="Pilih atau ketik nama pengirim baru"

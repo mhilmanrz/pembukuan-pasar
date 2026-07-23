@@ -60,9 +60,18 @@ const create = async (req, res) => {
     try {
       await client.query('BEGIN');
 
+      let pengirimResult = await client.query('SELECT id FROM pengirim WHERE nama = $1', [nama_pengirim]);
+      let pengirimId;
+      if (pengirimResult.rows.length === 0) {
+        let newP = await client.query('INSERT INTO pengirim (nama) VALUES ($1) RETURNING id', [nama_pengirim]);
+        pengirimId = newP.rows[0].id;
+      } else {
+        pengirimId = pengirimResult.rows[0].id;
+      }
+
       const result = await client.query(
-        'INSERT INTO barang_masuk (tanggal, kg, nama_pengirim, harga, gambar) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [tanggal, kg, nama_pengirim, harga, gambar ? JSON.stringify(gambar) : '[]']
+        'INSERT INTO barang_masuk (tanggal, kg, nama_pengirim, pengirim_id, harga, gambar) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [tanggal, kg, nama_pengirim, pengirimId, harga, gambar ? JSON.stringify(gambar) : '[]']
       );
       const barangMasuk = result.rows[0];
 
@@ -107,9 +116,38 @@ const update = async (req, res) => {
     if (harga !== undefined && parseFloat(harga) < 0) return res.status(400).json({ error: 'Harga tidak boleh negatif' });
     if (nama_pengirim && nama_pengirim.length > 100) return res.status(400).json({ error: 'Nama pengirim maksimal 100 karakter' });
 
+    // Get current record to preserve fields and handle pengirimId relation correctly
+    const currentResult = await pool.query('SELECT nama_pengirim, pengirim_id FROM barang_masuk WHERE id = $1', [id]);
+    if (currentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Data tidak ditemukan' });
+    }
+    const current = currentResult.rows[0];
+    const finalNamaPengirim = nama_pengirim !== undefined ? nama_pengirim : current.nama_pengirim;
+
+    let pengirimId = current.pengirim_id;
+    if (finalNamaPengirim) {
+      let pengirimResult = await pool.query('SELECT id FROM pengirim WHERE nama = $1', [finalNamaPengirim]);
+      if (pengirimResult.rows.length === 0) {
+        let newP = await pool.query('INSERT INTO pengirim (nama) VALUES ($1) RETURNING id', [finalNamaPengirim]);
+        pengirimId = newP.rows[0].id;
+      } else {
+        pengirimId = pengirimResult.rows[0].id;
+      }
+    } else {
+      pengirimId = null;
+    }
+
     const result = await pool.query(
-      'UPDATE barang_masuk SET tanggal=$1, kg=$2, nama_pengirim=$3, harga=$4, gambar=$5 WHERE id=$6 RETURNING *',
-      [tanggal, kg, nama_pengirim, harga, gambar ? JSON.stringify(gambar) : '[]', id]
+      'UPDATE barang_masuk SET tanggal=COALESCE($1, tanggal), kg=COALESCE($2, kg), nama_pengirim=COALESCE($3, nama_pengirim), pengirim_id=$4, harga=COALESCE($5, harga), gambar=COALESCE($6, gambar) WHERE id=$7 RETURNING *',
+      [
+        tanggal, 
+        kg, 
+        nama_pengirim, 
+        pengirimId, 
+        harga, 
+        gambar ? JSON.stringify(gambar) : null, 
+        id
+      ]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Data tidak ditemukan' });
@@ -155,9 +193,9 @@ const restore = async (req, res) => {
 const getPengirimList = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT DISTINCT nama_pengirim FROM barang_masuk WHERE deleted_at IS NULL ORDER BY nama_pengirim ASC'
+      'SELECT id, nama, share_token, telepon FROM pengirim ORDER BY nama ASC'
     );
-    res.json(result.rows.map(r => r.nama_pengirim));
+    res.json(result.rows);
   } catch (err) {
     console.error('Error getPengirimList:', err);
     res.status(500).json({ error: 'Gagal mengambil daftar pengirim' });

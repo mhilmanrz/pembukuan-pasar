@@ -7,6 +7,7 @@ const getAll = async (req, res) => {
     let query = `
       SELECT hp.*, 
         COALESCE(SUM(p.jumlah_bayar), 0) AS total_dibayar,
+        COALESCE(SUM(p.kg_bayar), 0) AS total_kg_dibayar,
         hp.jumlah_total - COALESCE(SUM(p.jumlah_bayar), 0) AS sisa_tagihan
       FROM hutang_piutang hp
       LEFT JOIN pembayaran p ON p.hutang_piutang_id = hp.id
@@ -62,9 +63,20 @@ const create = async (req, res) => {
     if (kg && parseFloat(kg) < 0) return res.status(400).json({ error: 'Kg tidak boleh negatif' });
     if (parseFloat(jumlah_total) < 0) return res.status(400).json({ error: 'Jumlah total tidak boleh negatif' });
     if (nama.length > 100) return res.status(400).json({ error: 'Nama maksimal 100 karakter' });
+    let pelangganId = null;
+    if (tipe === 'piutang') {
+      let pelangganResult = await pool.query('SELECT id FROM pelanggan WHERE nama = $1', [nama]);
+      if (pelangganResult.rows.length === 0) {
+        let newP = await pool.query('INSERT INTO pelanggan (nama) VALUES ($1) RETURNING id', [nama]);
+        pelangganId = newP.rows[0].id;
+      } else {
+        pelangganId = pelangganResult.rows[0].id;
+      }
+    }
+
     const result = await pool.query(
-      'INSERT INTO hutang_piutang (tipe, tanggal, nama, kg, jumlah_total, keterangan) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [tipe, tanggal, nama, kg || null, jumlah_total, keterangan || null]
+      'INSERT INTO hutang_piutang (tipe, tanggal, nama, pelanggan_id, kg, jumlah_total, keterangan) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [tipe, tanggal, nama, pelangganId, kg || null, jumlah_total, keterangan || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -84,9 +96,33 @@ const update = async (req, res) => {
     if (kg !== undefined && kg !== null && parseFloat(kg) < 0) return res.status(400).json({ error: 'Kg tidak boleh negatif' });
     if (jumlah_total !== undefined && parseFloat(jumlah_total) < 0) return res.status(400).json({ error: 'Jumlah total tidak boleh negatif' });
     if (nama && nama.length > 100) return res.status(400).json({ error: 'Nama maksimal 100 karakter' });
+    // Get current record to preserve fields and handle pelangganId relation correctly
+    const currentResult = await pool.query('SELECT tipe, nama, pelanggan_id FROM hutang_piutang WHERE id = $1', [id]);
+    if (currentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Data tidak ditemukan' });
+    }
+    const current = currentResult.rows[0];
+    const finalTipe = tipe !== undefined ? tipe : current.tipe;
+    const finalNama = nama !== undefined ? nama : current.nama;
+
+    let pelangganId = current.pelanggan_id;
+    if (finalTipe === 'piutang') {
+      if (finalNama) {
+        let pelangganResult = await pool.query('SELECT id FROM pelanggan WHERE nama = $1', [finalNama]);
+        if (pelangganResult.rows.length === 0) {
+          let newP = await pool.query('INSERT INTO pelanggan (nama) VALUES ($1) RETURNING id', [finalNama]);
+          pelangganId = newP.rows[0].id;
+        } else {
+          pelangganId = pelangganResult.rows[0].id;
+        }
+      }
+    } else {
+      pelangganId = null;
+    }
+
     const result = await pool.query(
-      'UPDATE hutang_piutang SET tipe=$1, tanggal=$2, nama=$3, kg=$4, jumlah_total=$5, keterangan=$6 WHERE id=$7 RETURNING *',
-      [tipe, tanggal, nama, kg || null, jumlah_total, keterangan || null, id]
+      'UPDATE hutang_piutang SET tipe=COALESCE($1, tipe), tanggal=COALESCE($2, tanggal), nama=COALESCE($3, nama), pelanggan_id=$4, kg=COALESCE($5, kg), jumlah_total=COALESCE($6, jumlah_total), keterangan=COALESCE($7, keterangan) WHERE id=$8 RETURNING *',
+      [tipe, tanggal, nama, pelangganId, kg || null, jumlah_total, keterangan || null, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Data tidak ditemukan' });
@@ -136,12 +172,19 @@ const getPembayaranPelanggan = async (req, res) => {
     const summaryQuery = `
       SELECT 
         COALESCE(SUM(hp.jumlah_total), 0) AS total_piutang,
+        COALESCE(SUM(hp.kg), 0) AS total_kg_piutang,
         (
           SELECT COALESCE(SUM(p.jumlah_bayar), 0)
           FROM pembayaran p
           JOIN hutang_piutang hp2 ON p.hutang_piutang_id = hp2.id
           WHERE hp2.nama = $1 AND hp2.tipe = 'piutang' AND hp2.deleted_at IS NULL
-        ) AS total_dibayar
+        ) AS total_dibayar,
+        (
+          SELECT COALESCE(SUM(p.kg_bayar), 0)
+          FROM pembayaran p
+          JOIN hutang_piutang hp2 ON p.hutang_piutang_id = hp2.id
+          WHERE hp2.nama = $1 AND hp2.tipe = 'piutang' AND hp2.deleted_at IS NULL
+        ) AS total_kg_dibayar
       FROM hutang_piutang hp
       WHERE hp.nama = $1 AND hp.tipe = 'piutang' AND hp.deleted_at IS NULL
     `;
@@ -149,7 +192,7 @@ const getPembayaranPelanggan = async (req, res) => {
     
     // Individual payment records with IDs for editing
     const historyQuery = `
-      SELECT p.id, p.tanggal_bayar, p.jumlah_bayar, p.created_at
+      SELECT p.id, p.tanggal_bayar, p.jumlah_bayar, p.kg_bayar, p.created_at
       FROM pembayaran p
       JOIN hutang_piutang hp ON p.hutang_piutang_id = hp.id
       WHERE hp.nama = $1 AND hp.tipe = 'piutang' AND hp.deleted_at IS NULL
@@ -159,12 +202,15 @@ const getPembayaranPelanggan = async (req, res) => {
 
     const totalPiutang = parseFloat(summary.rows[0].total_piutang);
     const totalDibayar = parseFloat(summary.rows[0].total_dibayar);
+    const totalKgPiutang = parseFloat(summary.rows[0].total_kg_piutang);
+    const totalKgDibayar = parseFloat(summary.rows[0].total_kg_dibayar);
 
     res.json({
       nama_pelanggan: nama,
       pembayaran: payments.rows,
-      hutang_piutang: { jumlah_total: totalPiutang },
+      hutang_piutang: { jumlah_total: totalPiutang, kg: totalKgPiutang },
       total_dibayar: totalDibayar,
+      total_kg_dibayar: totalKgDibayar,
       sisa_tagihan: totalPiutang - totalDibayar,
     });
   } catch (err) {
@@ -178,8 +224,9 @@ const addPembayaranPelanggan = async (req, res) => {
   const client = await pool.connect();
   try {
     const { nama } = req.params;
-    const { tanggal_bayar, jumlah_bayar } = req.body;
+    const { tanggal_bayar, jumlah_bayar, kg_bayar } = req.body;
     let paymentLeft = parseFloat(jumlah_bayar);
+    let kgLeft = kg_bayar ? parseFloat(kg_bayar) : 0;
 
     if (!tanggal_bayar || !jumlah_bayar || paymentLeft <= 0) {
       return res.status(400).json({ error: 'Data pembayaran tidak valid' });
@@ -189,7 +236,7 @@ const addPembayaranPelanggan = async (req, res) => {
 
     // Get all unpaid for this sender (FIFO)
     const unpaidQuery = `
-      SELECT hp.id, hp.jumlah_total, COALESCE(SUM(p.jumlah_bayar), 0) AS total_dibayar
+      SELECT hp.id, hp.jumlah_total, hp.kg, COALESCE(SUM(p.jumlah_bayar), 0) AS total_dibayar, COALESCE(SUM(p.kg_bayar), 0) AS total_kg_dibayar
       FROM hutang_piutang hp
       LEFT JOIN pembayaran p ON p.hutang_piutang_id = hp.id
       WHERE hp.nama = $1 AND hp.tipe = 'piutang' AND hp.deleted_at IS NULL
@@ -202,13 +249,17 @@ const addPembayaranPelanggan = async (req, res) => {
     for (const item of unpaid.rows) {
       if (paymentLeft <= 0) break;
       const sisaTagihan = parseFloat(item.jumlah_total) - parseFloat(item.total_dibayar);
+      const sisaKg = (parseFloat(item.kg) || 0) - parseFloat(item.total_kg_dibayar);
       const toPay = Math.min(sisaTagihan, paymentLeft);
+      // For KG we distribute proportionally or just greedily up to sisaKg
+      const toPayKg = Math.min(Math.max(sisaKg, 0), kgLeft);
       
       await client.query(
-        'INSERT INTO pembayaran (hutang_piutang_id, tanggal_bayar, jumlah_bayar) VALUES ($1, $2, $3)',
-        [item.id, tanggal_bayar, toPay]
+        'INSERT INTO pembayaran (hutang_piutang_id, tanggal_bayar, jumlah_bayar, kg_bayar) VALUES ($1, $2, $3, $4)',
+        [item.id, tanggal_bayar, toPay, toPayKg || null]
       );
       paymentLeft -= toPay;
+      kgLeft -= toPayKg;
     }
 
     if (paymentLeft > 0) {
@@ -230,7 +281,7 @@ const addPembayaranPelanggan = async (req, res) => {
 const updatePembayaranPiutang = async (req, res) => {
   try {
     const { paymentId } = req.params;
-    const { tanggal_bayar, jumlah_bayar } = req.body;
+    const { tanggal_bayar, jumlah_bayar, kg_bayar } = req.body;
 
     if (!tanggal_bayar || !jumlah_bayar) {
       return res.status(400).json({ error: 'Tanggal dan jumlah bayar wajib diisi' });
@@ -257,8 +308,8 @@ const updatePembayaranPiutang = async (req, res) => {
     }
 
     const result = await pool.query(
-      'UPDATE pembayaran SET tanggal_bayar = $1, jumlah_bayar = $2 WHERE id = $3 RETURNING *',
-      [tanggal_bayar, jumlah_bayar, paymentId]
+      'UPDATE pembayaran SET tanggal_bayar = $1, jumlah_bayar = $2, kg_bayar = $3 WHERE id = $4 RETURNING *',
+      [tanggal_bayar, jumlah_bayar, kg_bayar || null, paymentId]
     );
 
     res.json(result.rows[0]);
@@ -268,5 +319,18 @@ const updatePembayaranPiutang = async (req, res) => {
   }
 };
 
-module.exports = { getAll, create, update, remove, restore, getPembayaranPelanggan, addPembayaranPelanggan, updatePembayaranPiutang };
+// GET /api/hutang-piutang/pelanggan
+const getPelangganList = async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, nama, share_token, telepon FROM pelanggan ORDER BY nama ASC'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error getPelangganList:', err);
+    res.status(500).json({ error: 'Gagal mengambil daftar pelanggan' });
+  }
+};
+
+module.exports = { getAll, create, update, remove, restore, getPembayaranPelanggan, addPembayaranPelanggan, updatePembayaranPiutang, getPelangganList };
 

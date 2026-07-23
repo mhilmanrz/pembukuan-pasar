@@ -1,10 +1,10 @@
 # =============================================
-# CI/CD Pipeline - Pembukuan Semangka
+# CI/CD Pipeline - Pembukuan Pasar
 # Deploy Frontend ke Netlify & Backend ke Railway
 # Trigger: push ke branch main
 # =============================================
 
-name: 🍉 Deploy Pembukuan Semangka
+name: Deploy Pembukuan Pasar
 
 on:
   push:
