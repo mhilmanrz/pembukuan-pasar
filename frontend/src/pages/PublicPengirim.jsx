@@ -61,7 +61,7 @@ export default function PublicPengirim() {
       <div className="max-w-md mx-auto p-4 space-y-6">
         {/* Ringkasan */}
         <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-3xl p-5 shadow-xl text-white">
-          <p className="text-xs text-white/70 font-medium mb-1">Status Tagihan</p>
+          <p className="text-xs text-white/70 font-medium mb-1">Sisa Tagihan</p>
           <div className="flex items-center gap-3 mb-6">
             <h2 className="text-3xl font-bold">{formatRupiah(sisa_tagihan)}</h2>
             {lunas && <span className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/30">LUNAS</span>}
