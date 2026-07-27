@@ -73,7 +73,7 @@ export default function PublicPengirim() {
               <p className="text-sm font-semibold">{formatRupiah(total_hutang)}</p>
             </div>
             <div className="text-right">
-              <p className="text-[10px] text-white/60 mb-0.5">Sudah Dibayar</p>
+              <p className="text-[10px] text-white/60 mb-0.5">Sudah Dibayar + BB</p>
               <p className="text-sm font-semibold">{formatRupiah(total_dibayar)}</p>
             </div>
           </div>
