@@ -35,6 +35,21 @@ const getAll = async (req, res) => {
   }
 };
 
+// GET /api/penjualan/:id
+const getById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM penjualan WHERE id = $1 AND deleted_at IS NULL', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Data tidak ditemukan' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error getById penjualan:', err);
+    res.status(500).json({ error: 'Gagal mengambil data penjualan' });
+  }
+};
+
 // POST /api/penjualan
 const create = async (req, res) => {
   try {
@@ -112,4 +127,4 @@ const restore = async (req, res) => {
   }
 };
 
-module.exports = { getAll, create, update, remove, restore };
+module.exports = { getAll, getById, create, update, remove, restore };

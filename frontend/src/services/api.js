@@ -31,6 +31,7 @@ api.interceptors.response.use(
 
 // Barang Masuk
 export const getBarangMasuk = (params) => api.get('/barang-masuk', { params });
+export const getBarangMasukById = (id) => api.get(`/barang-masuk/${id}`);
 export const getPengirimList = () => api.get('/barang-masuk/pengirim');
 export const createBarangMasuk = (data) => api.post('/barang-masuk', data);
 export const updateBarangMasuk = (id, data) => api.put(`/barang-masuk/${id}`, data);
@@ -44,6 +45,7 @@ export const updatePembayaranBM = (paymentId, data) => api.put(`/barang-masuk/pe
 
 // Penjualan
 export const getPenjualan = (params) => api.get('/penjualan', { params });
+export const getPenjualanById = (id) => api.get(`/penjualan/${id}`);
 export const createPenjualan = (data) => api.post('/penjualan', data);
 export const updatePenjualan = (id, data) => api.put(`/penjualan/${id}`, data);
 export const deletePenjualan = (id) => api.delete(`/penjualan/${id}`);
@@ -51,6 +53,7 @@ export const restorePenjualan = (id) => api.put(`/penjualan/${id}/restore`);
 
 // Hutang Piutang
 export const getHutangPiutang = (params) => api.get('/hutang-piutang', { params });
+export const getHutangPiutangById = (id) => api.get(`/hutang-piutang/${id}`);
 export const getPelangganList = () => api.get('/hutang-piutang/pelanggan');
 export const createHutangPiutang = (data) => api.post('/hutang-piutang', data);
 export const updateHutangPiutang = (id, data) => api.put(`/hutang-piutang/${id}`, data);
@@ -67,6 +70,14 @@ export const updatePembayaranPiutang = (paymentId, data) => api.put(`/hutang-piu
 // Laporan
 export const getLaporan = (params) => api.get('/laporan', { params });
 export const getGrafikPenjualan = (params) => api.get('/laporan/grafik', { params });
+
+// Periode Pembukuan
+export const getPeriodeAll = () => api.get('/periode');
+export const getPeriodeAktif = () => api.get('/periode/aktif');
+export const bukaBuku = (data) => api.post('/periode/buka', data);
+export const tutupBuku = (data) => api.put('/periode/tutup', data);
+export const updatePeriode = (id, data) => api.put(`/periode/${id}`, data);
+export const deletePeriode = (id) => api.delete(`/periode/${id}`);
 
 // Public Links
 export const getPublicPengirim = (token) => api.get(`/public/pengirim/${token}`);

@@ -34,7 +34,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // Root welcome
 app.get('/', (req, res) => {
   res.json({ 
-    name: 'Pembukuan Semangka API', 
+    name: 'Pembukuan Pasar API', 
     status: 'running',
     version: '1.0.0'
   });

@@ -37,11 +37,8 @@ export default function Login() {
       <div className="w-full max-w-sm relative">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-melon-500 to-melon-700 mb-4 shadow-lg shadow-melon-500/20">
-            <span className="text-3xl">🍉</span>
-          </div>
           <h1 className="text-2xl font-bold text-text-primary">
-            Pembukuan Semangka
+            Pembukuan Pasar
           </h1>
           <p className="text-text-secondary text-sm mt-1">
             Masuk untuk mengelola pembukuan
@@ -146,7 +143,7 @@ export default function Login() {
 
         {/* Footer */}
         <p className="text-center text-text-muted text-xs mt-6">
-          © 2026 Pembukuan Semangka v2
+          © 2026 Pembukuan Pasar v2
         </p>
       </div>
     </div>

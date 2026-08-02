@@ -7,6 +7,7 @@ const penjualanController = require('../controllers/penjualanController');
 const hutangPiutangController = require('../controllers/hutangPiutangController');
 const laporanController = require('../controllers/laporanController');
 const publicController = require('../controllers/publicController');
+const periodeController = require('../controllers/periodeController');
 
 // ──────────────────────────────────────
 // Auth (public)
@@ -37,12 +38,14 @@ router.post('/barang-masuk', barangMasukController.create);
 router.get('/barang-masuk/:id/bayar', barangMasukController.getPembayaran);
 router.post('/barang-masuk/:id/bayar', barangMasukController.addPembayaran);
 router.put('/barang-masuk/pembayaran/:paymentId', barangMasukController.updatePembayaran);
+router.get('/barang-masuk/:id', barangMasukController.getById);
 router.put('/barang-masuk/:id', barangMasukController.update);
 router.delete('/barang-masuk/:id', barangMasukController.remove);
 router.put('/barang-masuk/:id/restore', barangMasukController.restore);
 
 // Penjualan
 router.get('/penjualan', penjualanController.getAll);
+router.get('/penjualan/:id', penjualanController.getById);
 router.post('/penjualan', penjualanController.create);
 router.put('/penjualan/:id', penjualanController.update);
 router.delete('/penjualan/:id', penjualanController.remove);
@@ -55,9 +58,18 @@ router.get('/hutang-piutang/pelanggan/:nama/bayar', hutangPiutangController.getP
 router.post('/hutang-piutang/pelanggan/:nama/bayar', hutangPiutangController.addPembayaranPelanggan);
 router.post('/hutang-piutang', hutangPiutangController.create);
 router.put('/hutang-piutang/pembayaran/:paymentId', hutangPiutangController.updatePembayaranPiutang);
+router.get('/hutang-piutang/:id', hutangPiutangController.getById);
 router.put('/hutang-piutang/:id', hutangPiutangController.update);
 router.delete('/hutang-piutang/:id', hutangPiutangController.remove);
 router.put('/hutang-piutang/:id/restore', hutangPiutangController.restore);
+
+// Periode Pembukuan
+router.get('/periode', periodeController.getAll);
+router.get('/periode/aktif', periodeController.getAktif);
+router.post('/periode/buka', periodeController.bukaBuku);
+router.put('/periode/tutup', periodeController.tutupBuku);
+router.put('/periode/:id', periodeController.update);
+router.delete('/periode/:id', periodeController.remove);
 
 // Laporan
 router.get('/laporan', laporanController.getLaporan);
