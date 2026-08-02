@@ -45,6 +45,30 @@ const getAll = async (req, res) => {
   }
 };
 
+// GET /api/barang-masuk/:id
+const getById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = `
+      SELECT bm.*, 
+        COALESCE(SUM(pbm.jumlah_bayar), 0) AS total_dibayar,
+        bm.harga - COALESCE(SUM(pbm.jumlah_bayar), 0) AS sisa_bayar
+      FROM barang_masuk bm
+      LEFT JOIN pembayaran_barang_masuk pbm ON pbm.barang_masuk_id = bm.id
+      WHERE bm.id = $1 AND bm.deleted_at IS NULL
+      GROUP BY bm.id
+    `;
+    const result = await pool.query(query, [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Data tidak ditemukan' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error getById barang_masuk:', err);
+    res.status(500).json({ error: 'Gagal mengambil data barang masuk' });
+  }
+};
+
 // POST /api/barang-masuk
 const create = async (req, res) => {
   try {
@@ -440,4 +464,4 @@ const updatePembayaran = async (req, res) => {
   }
 };
 
-module.exports = { getAll, create, update, remove, restore, getPengirimList, addPembayaran, getPembayaran, addPembayaranPengirim, getPembayaranPengirim, updatePembayaran };
+module.exports = { getAll, getById, create, update, remove, restore, getPengirimList, addPembayaran, getPembayaran, addPembayaranPengirim, getPembayaranPengirim, updatePembayaran };

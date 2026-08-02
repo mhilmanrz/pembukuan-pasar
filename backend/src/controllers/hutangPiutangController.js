@@ -50,6 +50,31 @@ const getAll = async (req, res) => {
   }
 };
 
+// GET /api/hutang-piutang/:id
+const getById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = `
+      SELECT hp.*, 
+        COALESCE(SUM(p.jumlah_bayar), 0) AS total_dibayar,
+        COALESCE(SUM(p.kg_bayar), 0) AS total_kg_dibayar,
+        hp.jumlah_total - COALESCE(SUM(p.jumlah_bayar), 0) AS sisa_tagihan
+      FROM hutang_piutang hp
+      LEFT JOIN pembayaran p ON p.hutang_piutang_id = hp.id
+      WHERE hp.id = $1 AND hp.deleted_at IS NULL
+      GROUP BY hp.id
+    `;
+    const result = await pool.query(query, [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Data tidak ditemukan' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error getById hutang_piutang:', err);
+    res.status(500).json({ error: 'Gagal mengambil data hutang/piutang' });
+  }
+};
+
 // POST /api/hutang-piutang
 const create = async (req, res) => {
   try {
@@ -341,5 +366,5 @@ const getPelangganList = async (req, res) => {
   }
 };
 
-module.exports = { getAll, create, update, remove, restore, getPembayaranPelanggan, addPembayaranPelanggan, updatePembayaranPiutang, getPelangganList };
+module.exports = { getAll, getById, create, update, remove, restore, getPembayaranPelanggan, addPembayaranPelanggan, updatePembayaranPiutang, getPelangganList };
 

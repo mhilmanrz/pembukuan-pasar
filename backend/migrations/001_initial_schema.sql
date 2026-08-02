@@ -1,5 +1,5 @@
 -- Migration: Initial Schema
--- Description: Create tables for pembukuan semangka
+-- Description: Create tables for pembukuan pasar
 
 CREATE TABLE IF NOT EXISTS barang_masuk (
   id SERIAL PRIMARY KEY,

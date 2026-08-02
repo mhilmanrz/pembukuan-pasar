@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
-import { getLaporan, getGrafikPenjualan } from '../services/api';
-import { formatRupiah, formatKg, todayStr } from '../utils/format';
-import PageHeader from '../components/PageHeader';
+import { getGrafikPenjualan } from '../services/api';
+import { formatRupiah, formatKg } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
+import { usePeriode } from '../context/PeriodeContext';
+import { getDateParams } from '../utils/dateHelper';
+import PageHeader from '../components/PageHeader';
+import DateFilterChips from '../components/DateFilterChips';
+import PeriodeBanner from '../components/PeriodeBanner';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -14,6 +18,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts';
+import api from '../services/api';
 
 const cards = [
   { key: 'sisa_stok_kg', label: 'Sisa Stok', icon: '🍉', format: formatKg, color: 'from-melon-600 to-melon-800' },
@@ -24,6 +29,14 @@ const cards = [
   { key: 'piutang_belum_tertagih', label: 'Piutang Belum Tertagih', icon: '📤', format: formatRupiah, color: 'from-amber-600 to-amber-800' },
   { key: 'hutang_belum_dibayar', label: 'Hutang Belum Dibayar', icon: '📥', format: formatRupiah, color: 'from-rose-600 to-rose-800' },
 ];
+
+const filterLabel = {
+  'periode-ini': '(Periode Ini)',
+  'bulan-ini': '(Bulan Ini)',
+  'hari-ini': '(Hari Ini)',
+  'semua': '(Semua Waktu)',
+  custom: '(Kustom)',
+};
 
 const periodeOptions = [
   { val: 'mingguan', label: 'Mingguan' },
@@ -51,53 +64,34 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function Dashboard() {
   const { logout } = useAuth();
+  const { globalFilter, setGlobalFilter, globalDari, setGlobalDari, globalSampai, setGlobalSampai, periodeAktif, periodeList } = usePeriode();
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('bulan-ini');
-  const [dari, setDari] = useState('');
-  const [sampai, setSampai] = useState(todayStr());
 
   const [chartData, setChartData] = useState([]);
   const [chartLoading, setChartLoading] = useState(true);
   const [periode, setPeriode] = useState('mingguan');
 
   useEffect(() => {
-    fetchLaporan();
-  }, [filter, dari, sampai]);
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const params = getDateParams(globalFilter, globalDari, globalSampai, periodeAktif, periodeList);
+        const res = await api.get(`/laporan?${new URLSearchParams(params).toString()}`);
+        setData(res.data);
+      } catch (err) {
+        console.error('Gagal memuat laporan', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [globalFilter, globalDari, globalSampai, periodeAktif, periodeList]);
 
   useEffect(() => {
     fetchGrafik();
   }, [periode]);
-
-  const fetchLaporan = async () => {
-    setLoading(true);
-    try {
-      const params = {};
-      if (filter === 'hari-ini') {
-        params.dari = todayStr();
-        params.sampai = todayStr();
-      } else if (filter === 'minggu-ini') {
-        const now = new Date();
-        const start = new Date(now);
-        start.setDate(now.getDate() - now.getDay());
-        params.dari = start.toISOString().split('T')[0];
-        params.sampai = todayStr();
-      } else if (filter === 'bulan-ini') {
-        const now = new Date();
-        params.dari = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-        params.sampai = todayStr();
-      } else if (filter === 'custom' && dari && sampai) {
-        params.dari = dari;
-        params.sampai = sampai;
-      }
-      const res = await getLaporan(params);
-      setData(res.data);
-    } catch (err) {
-      console.error('Gagal memuat laporan:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchGrafik = async () => {
     setChartLoading(true);
@@ -115,7 +109,7 @@ export default function Dashboard() {
     <div>
       <PageHeader 
         title="Dashboard" 
-        subtitle="Ringkasan pembukuan semangka" 
+        subtitle="Ringkasan pembukuan Pasar" 
         action={
           <button
             onClick={logout}
@@ -129,51 +123,22 @@ export default function Dashboard() {
         }
       />
 
-      {/* Filter */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-1 px-1">
-        {[
-          { val: 'bulan-ini', label: 'Bulan Ini' },
-          { val: 'minggu-ini', label: 'Minggu Ini' },
-          { val: 'hari-ini', label: 'Hari Ini' },
-          { val: 'semua', label: 'Semua' },
-          { val: 'custom', label: 'Custom' },
-        ].map((f) => (
-          <button
-            key={f.val}
-            onClick={() => setFilter(f.val)}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-              filter === f.val
-                ? 'bg-watermelon-500 text-white shadow-lg shadow-watermelon-500/25'
-                : 'bg-surface-card text-text-secondary hover:bg-surface-elevated'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="mb-2 mt-2">
+        <PeriodeBanner onPeriodeSelect={setGlobalFilter} />
       </div>
 
-      {filter === 'custom' && (
-        <div className="flex gap-3 mb-6">
-          <div className="flex-1">
-            <label className="text-xs text-text-muted mb-1 block">Dari</label>
-            <input
-              type="date"
-              value={dari}
-              onChange={(e) => setDari(e.target.value)}
-              className="w-full bg-surface-card border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="text-xs text-text-muted mb-1 block">Sampai</label>
-            <input
-              type="date"
-              value={sampai}
-              onChange={(e) => setSampai(e.target.value)}
-              className="w-full bg-surface-card border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary"
-            />
-          </div>
-        </div>
-      )}
+      {/* Filter */}
+      <div className="mb-6">
+        <DateFilterChips
+          filter={globalFilter}
+          onFilterChange={setGlobalFilter}
+          dari={globalDari}
+          onDariChange={setGlobalDari}
+          sampai={globalSampai}
+          onSampaiChange={setGlobalSampai}
+          color="watermelon"
+        />
+      </div>
 
       {/* Cards */}
       <div className="grid grid-cols-2 gap-3">
@@ -183,7 +148,6 @@ export default function Dashboard() {
             className={`bg-gradient-to-br ${card.color} rounded-2xl p-4 shadow-lg transition-transform duration-200 active:scale-[0.98] ${index === 0 ? 'col-span-2' : 'col-span-1'}`}
           >
             {index === 0 ? (
-              // Layout untuk kartu pertama (Full width)
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-white/80 font-medium">{card.label}</p>
@@ -198,7 +162,6 @@ export default function Dashboard() {
                 <span className="text-4xl opacity-80">{card.icon}</span>
               </div>
             ) : (
-              // Layout untuk kartu lainnya (Setengah lebar)
               <div className="flex flex-col h-full gap-2">
                 <span className="text-2xl opacity-80 mb-1">{card.icon}</span>
                 <div className="mt-auto">
@@ -222,8 +185,6 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-text-primary">📈 Grafik Penjualan</h2>
         </div>
-
-        {/* Periode selector */}
         <div className="flex gap-2 mb-5">
           {periodeOptions.map((opt) => (
             <button
@@ -239,7 +200,6 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
-
         {chartLoading ? (
           <div className="h-64 flex items-center justify-center">
             <div className="w-8 h-8 border-2 border-watermelon-500 border-t-transparent rounded-full animate-spin" />
@@ -251,7 +211,6 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Area Chart - Penjualan (Rupiah) */}
             <div>
               <p className="text-xs text-text-muted mb-3 font-medium">Penjualan (Rp)</p>
               <ResponsiveContainer width="100%" height={220}>
@@ -263,56 +222,25 @@ export default function Dashboard() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: '#64748b', fontSize: 11 }}
-                    axisLine={{ stroke: '#334155' }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: '#64748b', fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(0)}jt` : v >= 1000 ? `${(v / 1000).toFixed(0)}rb` : v}
-                  />
+                  <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#334155' }} tickLine={false} />
+                  <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false}
+                    tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(0)}jt` : v >= 1000 ? `${(v / 1000).toFixed(0)}rb` : v} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Area
-                    type="monotone"
-                    dataKey="total_penjualan"
-                    stroke="#ef4444"
-                    strokeWidth={2.5}
-                    fill="url(#gradientPenjualan)"
-                    dot={{ r: 4, fill: '#ef4444', stroke: '#1e293b', strokeWidth: 2 }}
-                    activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }}
-                  />
+                  <Area type="monotone" dataKey="total_penjualan" stroke="#ef4444" strokeWidth={2.5}
+                    fill="url(#gradientPenjualan)" dot={{ r: 4, fill: '#ef4444', stroke: '#1e293b', strokeWidth: 2 }}
+                    activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-
-            {/* Bar Chart - Kg Terjual */}
             <div>
               <p className="text-xs text-text-muted mb-3 font-medium">Kg Terjual</p>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={chartData} margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: '#64748b', fontSize: 11 }}
-                    axisLine={{ stroke: '#334155' }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: '#64748b', fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
+                  <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#334155' }} tickLine={false} />
+                  <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar
-                    dataKey="total_kg"
-                    fill="#22c55e"
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={40}
-                  />
+                  <Bar dataKey="total_kg" fill="#22c55e" radius={[6, 6, 0, 0]} maxBarSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

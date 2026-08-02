@@ -26,3 +26,9 @@ export function formatTanggal(dateStr) {
 export function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
+
+export function startOfMonthStr() {
+  const d = new Date();
+  d.setDate(1);
+  return d.toISOString().split('T')[0];
+}
