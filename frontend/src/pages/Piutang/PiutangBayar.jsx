@@ -48,7 +48,7 @@ export default function PiutangBayar() {
       groups[key].items.push(p);
     });
     return Object.values(groups);
-  }, [bayarData?.pembayaran]);
+  }, [bayarData?.pembayaran, payFilter]);
 
   useEffect(() => { fetchData(); }, []);
 
