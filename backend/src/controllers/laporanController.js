@@ -208,4 +208,68 @@ const getGrafikPenjualan = async (req, res) => {
   }
 };
 
-module.exports = { getLaporan, getGrafikPenjualan };
+// GET /api/laporan/riwayat-pembayaran — All payments (piutang + barang masuk)
+const getRiwayatPembayaran = async (req, res) => {
+  try {
+    const { dari, sampai } = req.query;
+
+    let dateFilter = '';
+    const params = [];
+
+    if (dari && sampai) {
+      dateFilter = 'AND p.tanggal_bayar BETWEEN $1 AND $2';
+      params.push(dari, sampai);
+    } else if (dari) {
+      dateFilter = 'AND p.tanggal_bayar >= $1';
+      params.push(dari);
+    } else if (sampai) {
+      dateFilter = 'AND p.tanggal_bayar <= $1';
+      params.push(sampai);
+    }
+
+    // Piutang payments
+    const piutangQuery = `
+      SELECT
+        p.id, p.tanggal_bayar, p.jumlah_bayar, p.kg_bayar, p.created_at,
+        'piutang' AS sumber,
+        hp.nama AS nama_pihak,
+        hp.id AS referensi_id
+      FROM pembayaran p
+      JOIN hutang_piutang hp ON p.hutang_piutang_id = hp.id
+      WHERE hp.tipe = 'piutang' AND hp.deleted_at IS NULL ${dateFilter}
+      ORDER BY p.tanggal_bayar DESC, p.created_at DESC
+    `;
+
+    // Barang masuk payments
+    const bmQuery = `
+      SELECT
+        pbm.id, pbm.tanggal_bayar, pbm.jumlah_bayar, NULL AS kg_bayar, pbm.created_at,
+        'stok_masuk' AS sumber,
+        bm.nama_pengirim AS nama_pihak,
+        bm.id AS referensi_id
+      FROM pembayaran_barang_masuk pbm
+      JOIN barang_masuk bm ON pbm.barang_masuk_id = bm.id
+      WHERE bm.deleted_at IS NULL ${dateFilter}
+      ORDER BY pbm.tanggal_bayar DESC, pbm.created_at DESC
+    `;
+
+    const [piutangRes, bmRes] = await Promise.all([
+      pool.query(piutangQuery, params),
+      pool.query(bmQuery, params),
+    ]);
+
+    // Merge and sort by tanggal_bayar DESC
+    const all = [...piutangRes.rows, ...bmRes.rows];
+    all.sort((a, b) => {
+      const d = new Date(b.tanggal_bayar) - new Date(a.tanggal_bayar);
+      return d !== 0 ? d : new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    res.json(all);
+  } catch (err) {
+    console.error('Error getRiwayatPembayaran:', err);
+    res.status(500).json({ error: 'Gagal mengambil riwayat pembayaran' });
+  }
+};
+
+module.exports = { getLaporan, getGrafikPenjualan, getRiwayatPembayaran };

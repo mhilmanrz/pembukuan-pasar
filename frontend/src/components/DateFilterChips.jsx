@@ -71,8 +71,8 @@ export default function DateFilterChips({
       </div>
 
       {showPeriodeMenu && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setShowPeriodeMenu(false)}>
-          <div className="w-full max-w-md bg-surface-elevated rounded-2xl border border-border shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setShowPeriodeMenu(false)}>
+          <div className="w-full max-w-sm bg-surface-elevated rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col max-h-[70vh] animate-slide-up" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-text-primary mb-0.5">📚 Riwayat Periode</h3>
