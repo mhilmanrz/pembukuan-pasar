@@ -366,5 +366,23 @@ const getPelangganList = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getById, create, update, remove, restore, getPembayaranPelanggan, addPembayaranPelanggan, updatePembayaranPiutang, getPelangganList };
+// DELETE /api/hutang-piutang/pembayaran/:paymentId — Delete a piutang payment record
+const deletePembayaranPiutang = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+
+    const current = await pool.query('SELECT * FROM pembayaran WHERE id = $1', [paymentId]);
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: 'Data pembayaran tidak ditemukan' });
+    }
+
+    await pool.query('DELETE FROM pembayaran WHERE id = $1', [paymentId]);
+    res.json({ message: 'Pembayaran berhasil dihapus' });
+  } catch (err) {
+    console.error('Error deletePembayaranPiutang:', err);
+    res.status(500).json({ error: 'Gagal menghapus pembayaran' });
+  }
+};
+
+module.exports = { getAll, getById, create, update, remove, restore, getPembayaranPelanggan, addPembayaranPelanggan, updatePembayaranPiutang, deletePembayaranPiutang, getPelangganList };
 

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { getPembayaranPengirim, addPembayaranPengirim, updatePembayaranBM } from '../../services/api';
+import { getPembayaranPengirim, addPembayaranPengirim, updatePembayaranBM, deletePembayaranBM } from '../../services/api';
 import { formatRupiah, formatKg, formatTanggal, todayStr } from '../../utils/format';
 // PageHeader removed
 import CurrencyInput from '../../components/CurrencyInput';
@@ -15,6 +15,38 @@ export default function BarangMasukBayar() {
   const [bayarForm, setBayarForm] = useState({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
   const [savingBayar, setSavingBayar] = useState(false);
   const [editPayment, setEditPayment] = useState(null);
+  const [expandedGroup, setExpandedGroup] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // payment object to delete
+  const [deleting, setDeleting] = useState(false);
+  const [payFilter, setPayFilter] = useState('semua'); // 'semua' | 'bulan-ini' | '3-bulan'
+  const [showAllPay, setShowAllPay] = useState(false);
+
+  // Group split payments (FIFO) by tanggal_bayar + created_at so they display as one
+  const groupedPayments = useMemo(() => {
+    if (!bayarData?.pembayaran) return [];
+    const now = new Date();
+    const filtered = bayarData.pembayaran.filter(p => {
+      if (payFilter === 'bulan-ini') {
+        const d = new Date(p.tanggal_bayar);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+      if (payFilter === '3-bulan') {
+        const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 3);
+        return new Date(p.tanggal_bayar) >= cutoff;
+      }
+      return true;
+    });
+    const groups = {};
+    filtered.forEach(p => {
+      const key = `${p.tanggal_bayar}_${p.created_at?.split('.')[0]}`;
+      if (!groups[key]) {
+        groups[key] = { key, tanggal_bayar: p.tanggal_bayar, created_at: p.created_at, total: 0, items: [] };
+      }
+      groups[key].total += parseFloat(p.jumlah_bayar);
+      groups[key].items.push(p);
+    });
+    return Object.values(groups);
+  }, [bayarData?.pembayaran]);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -48,6 +80,21 @@ export default function BarangMasukBayar() {
   const cancelEditPayment = () => {
     setEditPayment(null);
     setBayarForm({ tanggal_bayar: todayStr(), jumlah_bayar: '' });
+  };
+
+  const handleDeletePayment = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await deletePembayaranBM(confirmDelete.id);
+      setConfirmDelete(null);
+      setBayarData((await getPembayaranPengirim(decodedNama)).data);
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Gagal menghapus pembayaran');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -103,24 +150,90 @@ export default function BarangMasukBayar() {
                 ))}
               </div>
             </div>
-          )}
-
-          {/* Payment history */}
-          {bayarData.pembayaran?.length > 0 && (
+                    {/* Payment history */}
+          {groupedPayments.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-text-secondary mb-2">Riwayat Pembayaran</h4>
-              <div className="space-y-2">
-                {bayarData.pembayaran.map((p) => (
-                  <div key={p.id} className={`flex justify-between items-center bg-surface-card rounded-xl px-4 py-3 border transition-colors ${editPayment?.id === p.id ? 'border-melon-500 bg-melon-500/5' : 'border-border'}`}>
-                    <span className="text-sm text-text-muted">{formatTanggal(p.tanggal_bayar)}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-melon-400 font-medium">{formatRupiah(p.jumlah_bayar)}</span>
-                      <button type="button" onClick={() => startEditPayment(p)}
-                        className="p-1 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors text-xs" title="Edit pembayaran">✏️</button>
-                    </div>
-                  </div>
-                ))}
+              {/* Header + filter chips */}
+              <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                <h4 className="text-sm font-semibold text-text-secondary">
+                  Riwayat Pembayaran
+                  {groupedPayments.length > 0 && <span className="ml-1.5 text-xs font-normal text-text-muted">({groupedPayments.length})</span>}
+                </h4>
+                <div className="flex gap-1">
+                  {[['semua','Semua'],['bulan-ini','Bln Ini'],['3-bulan','3 Bln']].map(([val,label]) => (
+                    <button key={val} type="button" onClick={() => { setPayFilter(val); setShowAllPay(false); }}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+                        payFilter === val ? 'bg-melon-500 text-white' : 'bg-surface-elevated text-text-muted hover:text-text-primary'
+                      }`}>{label}</button>
+                  ))}
+                </div>
               </div>
+
+              {groupedPayments.length === 0 ? (
+                <p className="text-xs text-text-muted text-center py-4">Tidak ada pembayaran di periode ini</p>
+              ) : (
+                /* Fixed-height scrollable box (Opsi B) */
+                <div className={`overflow-y-auto transition-all duration-300 space-y-2 ${
+                  showAllPay ? 'max-h-[600px]' : 'max-h-[300px]'
+                } pr-0.5`}>
+                  {groupedPayments.map((group) => (
+                    <div key={group.key}>
+                      {/* Main grouped row */}
+                      <div className={`flex justify-between items-center bg-surface-card rounded-xl px-4 py-3 border transition-colors ${
+                        group.items.some(i => editPayment?.id === i.id) ? 'border-melon-500 bg-melon-500/5' : 'border-border'
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-text-muted">{formatTanggal(group.tanggal_bayar)}</span>
+                          {group.items.length > 1 && (
+                            <span className="text-[10px] bg-melon-500/15 text-melon-400 px-1.5 py-0.5 rounded-md font-medium">{group.items.length}x split</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-melon-400 font-medium">{formatRupiah(group.total)}</span>
+                          {group.items.length === 1 ? (
+                            <>
+                              <button type="button" onClick={() => startEditPayment(group.items[0])}
+                                className="p-1 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors text-xs" title="Edit pembayaran">✏️</button>
+                              <button type="button" onClick={() => setConfirmDelete(group.items[0])}
+                                className="p-1 rounded-lg hover:bg-watermelon-500/10 text-text-muted hover:text-watermelon-400 transition-colors text-xs" title="Hapus pembayaran">🗑️</button>
+                            </>
+                          ) : (
+                            <button type="button" onClick={() => setExpandedGroup(expandedGroup === group.key ? null : group.key)}
+                              className={`p-1 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-all text-xs ${expandedGroup === group.key ? 'rotate-180' : ''}`} title="Lihat detail">▾</button>
+                          )}
+                        </div>
+                      </div>
+                      {/* Expanded sub-items */}
+                      {expandedGroup === group.key && group.items.length > 1 && (
+                        <div className="ml-4 mt-1 space-y-1 border-l-2 border-melon-500/20 pl-3">
+                          {group.items.map((p) => (
+                            <div key={p.id} className={`flex justify-between items-center bg-surface-elevated/50 rounded-lg px-3 py-2 text-xs transition-colors ${
+                              editPayment?.id === p.id ? 'ring-1 ring-melon-500' : ''
+                            }`}>
+                              <span className="text-text-muted">Split #{group.items.indexOf(p) + 1}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-melon-400 font-medium">{formatRupiah(p.jumlah_bayar)}</span>
+                                <button type="button" onClick={() => startEditPayment(p)}
+                                  className="p-1 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Edit">✏️</button>
+                                <button type="button" onClick={() => setConfirmDelete(p)}
+                                  className="p-1 rounded-lg hover:bg-watermelon-500/10 text-text-muted hover:text-watermelon-400 transition-colors" title="Hapus">🗑️</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Show more / less toggle (Opsi A) */}
+              {groupedPayments.length > 4 && (
+                <button type="button" onClick={() => setShowAllPay(!showAllPay)}
+                  className="w-full mt-2 py-1.5 text-xs text-text-muted hover:text-text-primary text-center transition-colors">
+                  {showAllPay ? '▲ Sembunyikan' : `▼ Lihat ${groupedPayments.length - 4} lainnya`}
+                </button>
+              )}
             </div>
           )}
 
@@ -150,6 +263,33 @@ export default function BarangMasukBayar() {
         </div>
       )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setConfirmDelete(null)}>
+          <div className="w-full max-w-sm bg-surface-elevated rounded-2xl border border-border shadow-2xl p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-watermelon-500/15 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <h3 className="text-lg font-bold text-text-primary mb-1">Hapus Pembayaran?</h3>
+              <p className="text-sm text-text-muted">Pembayaran sebesar <span className="font-semibold text-watermelon-400">{formatRupiah(confirmDelete.jumlah_bayar)}</span> pada tanggal <span className="font-medium text-text-secondary">{formatTanggal(confirmDelete.tanggal_bayar)}</span> akan dihapus permanen.</p>
+            </div>
+            <div className="bg-watermelon-500/5 border border-watermelon-500/20 rounded-xl p-3 mb-5">
+              <p className="text-xs text-watermelon-400 font-medium">⚠️ Tindakan ini tidak bisa dibatalkan. Sisa tagihan pengirim akan bertambah kembali.</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 py-2.5 rounded-xl bg-surface-card border border-border text-text-secondary font-medium text-sm hover:bg-surface-elevated transition-colors">
+                Batal
+              </button>
+              <button onClick={handleDeletePayment} disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl bg-watermelon-500 text-white font-semibold text-sm hover:bg-watermelon-600 transition-colors disabled:opacity-50 shadow-lg shadow-watermelon-500/25">
+                {deleting ? 'Menghapus...' : '🗑️ Hapus'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

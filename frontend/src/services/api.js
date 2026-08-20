@@ -42,6 +42,7 @@ export const addPembayaranBM = (id, data) => api.post(`/barang-masuk/${id}/bayar
 export const getPembayaranPengirim = (nama) => api.get(`/barang-masuk/pengirim/${encodeURIComponent(nama)}/bayar`);
 export const addPembayaranPengirim = (nama, data) => api.post(`/barang-masuk/pengirim/${encodeURIComponent(nama)}/bayar`, data);
 export const updatePembayaranBM = (paymentId, data) => api.put(`/barang-masuk/pembayaran/${paymentId}`, data);
+export const deletePembayaranBM = (paymentId) => api.delete(`/barang-masuk/pembayaran/${paymentId}`);
 
 // Penjualan
 export const getPenjualan = (params) => api.get('/penjualan', { params });
@@ -66,10 +67,12 @@ export const getPembayaranByHP = (hutangPiutangId) => api.get(`/pembayaran/${hut
 export const getPembayaranPelanggan = (nama) => api.get(`/hutang-piutang/pelanggan/${encodeURIComponent(nama)}/bayar`);
 export const addPembayaranPelanggan = (nama, data) => api.post(`/hutang-piutang/pelanggan/${encodeURIComponent(nama)}/bayar`, data);
 export const updatePembayaranPiutang = (paymentId, data) => api.put(`/hutang-piutang/pembayaran/${paymentId}`, data);
+export const deletePembayaranPiutang = (paymentId) => api.delete(`/hutang-piutang/pembayaran/${paymentId}`);
 
 // Laporan
 export const getLaporan = (params) => api.get('/laporan', { params });
 export const getGrafikPenjualan = (params) => api.get('/laporan/grafik', { params });
+export const getRiwayatPembayaran = (params) => api.get('/laporan/riwayat-pembayaran', { params });
 
 // Periode Pembukuan
 export const getPeriodeAll = () => api.get('/periode');

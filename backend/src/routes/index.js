@@ -38,6 +38,7 @@ router.post('/barang-masuk', barangMasukController.create);
 router.get('/barang-masuk/:id/bayar', barangMasukController.getPembayaran);
 router.post('/barang-masuk/:id/bayar', barangMasukController.addPembayaran);
 router.put('/barang-masuk/pembayaran/:paymentId', barangMasukController.updatePembayaran);
+router.delete('/barang-masuk/pembayaran/:paymentId', barangMasukController.deletePembayaran);
 router.get('/barang-masuk/:id', barangMasukController.getById);
 router.put('/barang-masuk/:id', barangMasukController.update);
 router.delete('/barang-masuk/:id', barangMasukController.remove);
@@ -58,6 +59,7 @@ router.get('/hutang-piutang/pelanggan/:nama/bayar', hutangPiutangController.getP
 router.post('/hutang-piutang/pelanggan/:nama/bayar', hutangPiutangController.addPembayaranPelanggan);
 router.post('/hutang-piutang', hutangPiutangController.create);
 router.put('/hutang-piutang/pembayaran/:paymentId', hutangPiutangController.updatePembayaranPiutang);
+router.delete('/hutang-piutang/pembayaran/:paymentId', hutangPiutangController.deletePembayaranPiutang);
 router.get('/hutang-piutang/:id', hutangPiutangController.getById);
 router.put('/hutang-piutang/:id', hutangPiutangController.update);
 router.delete('/hutang-piutang/:id', hutangPiutangController.remove);
@@ -74,5 +76,6 @@ router.delete('/periode/:id', periodeController.remove);
 // Laporan
 router.get('/laporan', laporanController.getLaporan);
 router.get('/laporan/grafik', laporanController.getGrafikPenjualan);
+router.get('/laporan/riwayat-pembayaran', laporanController.getRiwayatPembayaran);
 
 module.exports = router;
