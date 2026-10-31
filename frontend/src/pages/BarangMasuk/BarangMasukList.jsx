@@ -278,16 +278,9 @@ export default function BarangMasukList() {
                       {lunas && <span className="text-[9px] bg-melon-500/15 text-melon-400 px-1.5 py-0.5 rounded-full font-bold">Lunas</span>}
                     </div>
 
-                    <div className="flex items-center justify-between mt-2 gap-3">
-                      <div className="flex items-center gap-2 text-[10px] text-text-muted">
-                        <span>{formatTanggal(item.tanggal)}</span>
-                        <span className="text-text-muted/60">•</span>
-                        <span>{formatKg(item.kg)}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-melon-400 leading-none">{formatRupiah(item.harga)}</div>
-                        {!lunas && <div className="text-[10px] text-amber-400 mt-0.5">Sisa: {formatRupiah(sisa)}</div>}
-                      </div>
+                    <div className="mt-2 space-y-1">
+                      <div className="text-[10px] text-text-muted">{formatTanggal(item.tanggal)}</div>
+                      <div className="text-[10px] text-text-muted">{formatKg(item.kg)}</div>
                     </div>
 
                     {item.gambar?.length > 0 && (
@@ -299,10 +292,17 @@ export default function BarangMasukList() {
                     )}
                   </div>
 
-                  <div className="flex gap-1">
-                    <button onClick={() => navigate(`/barang-masuk/bayar/${encodeURIComponent(item.nama_pengirim)}`)} className="p-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar">💳</button>
-                    <button onClick={() => navigate(`/barang-masuk/${item.id}/edit`, { state: { item } })} className="p-2 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors">✏️</button>
-                    <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg hover:bg-watermelon-500/10 text-text-muted hover:text-watermelon-400 transition-colors">🗑️</button>
+                  <div className=" mt-1 flex flex-col items-end justify-between gap-2">
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-melon-400 leading-none">{formatRupiah(item.harga)}</div>
+                      {!lunas && <div className="text-[10px] text-amber-400 mt-0.5">Sisa: {formatRupiah(sisa)}</div>}
+                    </div>
+
+                    <div className="flex gap-1">
+                      <button onClick={() => navigate(`/barang-masuk/bayar/${encodeURIComponent(item.nama_pengirim)}`)} className="p-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar">💳</button>
+                      <button onClick={() => navigate(`/barang-masuk/${item.id}/edit`, { state: { item } })} className="p-2 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors">✏️</button>
+                      <button onClick={() => handleDelete(item.id)} className="p-2 rounded-lg hover:bg-watermelon-500/10 text-text-muted hover:text-watermelon-400 transition-colors">🗑️</button>
+                    </div>
                   </div>
                 </div>
               </div>
