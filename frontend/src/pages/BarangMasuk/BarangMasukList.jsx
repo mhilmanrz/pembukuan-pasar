@@ -57,6 +57,14 @@ export default function BarangMasukList() {
     return items.filter(item => item.nama_pengirim === searchQuery);
   }, [items, searchQuery]);
 
+  const orderedItems = useMemo(() => {
+    return [...filteredItems].sort((a, b) => {
+      const dateDiff = new Date(b.tanggal) - new Date(a.tanggal);
+      if (dateDiff !== 0) return dateDiff;
+      return Number(b.id) - Number(a.id);
+    });
+  }, [filteredItems]);
+
   const pengirimTotals = useMemo(() => {
     const map = {};
     filteredItems.forEach(item => {
@@ -253,37 +261,44 @@ export default function BarangMasukList() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredItems.map((item) => {
+          {orderedItems.map((item, index) => {
             const sisa = parseFloat(item.sisa_bayar);
             const lunas = sisa <= 0;
             return (
               <div key={item.id} className={`bg-surface-card rounded-2xl p-4 border transition-colors ${lunas ? 'border-melon-500/30' : 'border-border hover:border-melon-500/30'}`}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1" onClick={() => navigate(`/barang-masuk/bayar/${encodeURIComponent(item.nama_pengirim)}`)} role="button">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] font-bold bg-surface-elevated text-text-muted px-2 py-1 rounded-full">No. {item.id}</span>
-                      <span className="text-xs font-bold bg-surface-elevated text-text-secondary px-2.5 py-1 rounded-full">{item.nama_pengirim}</span>
+                <div className="flex items-start gap-2.5">
+                  <span className="inline-flex w-6 h-6 shrink-0 items-center justify-center rounded-md bg-melon-500/10 text-melon-400 text-[10px] font-bold leading-none">{orderedItems.length - index}</span>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] font-bold bg-surface-elevated text-text-secondary px-2 py-0.5 rounded-full">{item.nama_pengirim}</span>
                       {item.no_plat_mobil && (
-                        <span className="text-[10px] font-semibold bg-surface-elevated text-text-muted px-2 py-1 rounded-full">{item.no_plat_mobil}</span>
+                        <span className="text-[9px] font-semibold bg-surface-elevated text-text-muted px-1.5 py-0.5 rounded-full">{item.no_plat_mobil}</span>
                       )}
-                      {lunas && <span className="text-xs bg-melon-500/15 text-melon-400 px-2 py-0.5 rounded-full font-bold">✓ Lunas</span>}
-                      <span className="text-xs text-text-muted">{formatTanggal(item.tanggal)}</span>
+                      {lunas && <span className="text-[9px] bg-melon-500/15 text-melon-400 px-1.5 py-0.5 rounded-full font-bold">Lunas</span>}
                     </div>
-                    <div className="flex items-center gap-4 text-sm mt-1">
-                      <span className="text-text-primary font-medium">{formatKg(item.kg)}</span>
-                      <span className="text-melon-400 font-bold">{formatRupiah(item.harga)}</span>
+
+                    <div className="flex items-center justify-between mt-2 gap-3">
+                      <div className="flex items-center gap-2 text-[10px] text-text-muted">
+                        <span>{formatTanggal(item.tanggal)}</span>
+                        <span className="text-text-muted/60">•</span>
+                        <span>{formatKg(item.kg)}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-melon-400 leading-none">{formatRupiah(item.harga)}</div>
+                        {!lunas && <div className="text-[10px] text-amber-400 mt-0.5">Sisa: {formatRupiah(sisa)}</div>}
+                      </div>
                     </div>
-                    {!lunas && (
-                      <p className="text-xs text-amber-400 mt-1">Sisa: {formatRupiah(sisa)}</p>
-                    )}
+
                     {item.gambar?.length > 0 && (
-                      <div className="flex gap-2 mt-3 overflow-x-auto pb-2" onClick={e => e.stopPropagation()}>
+                      <div className="flex gap-2 mt-3 overflow-x-auto pb-1" onClick={e => e.stopPropagation()}>
                         {item.gambar.map((g, i) => (
-                          <img key={i} src={g} alt={`Nota ${i+1}`} className="h-16 w-16 object-cover rounded-lg border border-border cursor-pointer hover:opacity-80" onClick={() => setPreviewImage(g)} />
+                          <img key={i} src={g} alt={`Nota ${i+1}`} className="h-14 w-14 object-cover rounded-lg border border-border cursor-pointer hover:opacity-80" onClick={() => setPreviewImage(g)} />
                         ))}
                       </div>
                     )}
                   </div>
+
                   <div className="flex gap-1">
                     <button onClick={() => navigate(`/barang-masuk/bayar/${encodeURIComponent(item.nama_pengirim)}`)} className="p-2 rounded-lg hover:bg-melon-500/10 text-text-muted hover:text-melon-400 transition-colors" title="Bayar">💳</button>
                     <button onClick={() => navigate(`/barang-masuk/${item.id}/edit`, { state: { item } })} className="p-2 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors">✏️</button>
@@ -298,7 +313,7 @@ export default function BarangMasukList() {
 
       {/* Image Preview */}
       {previewImage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/90 p-4" onClick={() => setPreviewImage(null)}>
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-background/90 p-4" onClick={() => setPreviewImage(null)}>
           <img src={previewImage} alt="Preview" className="max-w-full max-h-full rounded-lg" />
           <button className="absolute top-4 right-4 bg-surface p-2 rounded-full text-text-primary">✕</button>
         </div>
