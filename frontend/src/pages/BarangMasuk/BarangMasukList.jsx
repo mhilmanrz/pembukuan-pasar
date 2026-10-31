@@ -261,7 +261,11 @@ export default function BarangMasukList() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1" onClick={() => navigate(`/barang-masuk/bayar/${encodeURIComponent(item.nama_pengirim)}`)} role="button">
                     <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold bg-surface-elevated text-text-muted px-2 py-1 rounded-full">No. {item.id}</span>
                       <span className="text-xs font-bold bg-surface-elevated text-text-secondary px-2.5 py-1 rounded-full">{item.nama_pengirim}</span>
+                      {item.no_plat_mobil && (
+                        <span className="text-[10px] font-semibold bg-surface-elevated text-text-muted px-2 py-1 rounded-full">{item.no_plat_mobil}</span>
+                      )}
                       {lunas && <span className="text-xs bg-melon-500/15 text-melon-400 px-2 py-0.5 rounded-full font-bold">✓ Lunas</span>}
                       <span className="text-xs text-text-muted">{formatTanggal(item.tanggal)}</span>
                     </div>

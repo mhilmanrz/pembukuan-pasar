@@ -15,7 +15,7 @@ export default function BarangMasukForm() {
   const isEdit = !!id;
   const { onSuccess } = useOutletContext() || {};
 
-  const [form, setForm] = useState({ tanggal: todayStr(), kg: '', nama_pengirim: '', harga: '', sudah_dibayar: '', gambar: [] });
+  const [form, setForm] = useState({ tanggal: todayStr(), kg: '', nama_pengirim: '', harga: '', sudah_dibayar: '', gambar: [], no_plat_mobil: '' });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [pengirimList, setPengirimList] = useState([]);
@@ -33,13 +33,13 @@ export default function BarangMasukForm() {
   const loadEditData = async () => {
     if (location.state?.item) {
       const item = location.state.item;
-      setForm({ tanggal: item.tanggal?.split('T')[0] || '', kg: item.kg, nama_pengirim: item.nama_pengirim, harga: item.harga, gambar: item.gambar || [] });
+      setForm({ tanggal: item.tanggal?.split('T')[0] || '', kg: item.kg, nama_pengirim: item.nama_pengirim, harga: item.harga, gambar: item.gambar || [], no_plat_mobil: item.no_plat_mobil || '' });
       setLoading(false);
       return;
     }
     try {
       const item = (await getBarangMasukById(id)).data;
-      setForm({ tanggal: item.tanggal?.split('T')[0] || '', kg: item.kg, nama_pengirim: item.nama_pengirim, harga: item.harga, gambar: item.gambar || [] });
+      setForm({ tanggal: item.tanggal?.split('T')[0] || '', kg: item.kg, nama_pengirim: item.nama_pengirim, harga: item.harga, gambar: item.gambar || [], no_plat_mobil: item.no_plat_mobil || '' });
     } catch { alert('Gagal memuat data'); navigate('/barang-masuk'); }
     finally { setLoading(false); }
   };
@@ -100,6 +100,11 @@ export default function BarangMasukForm() {
           <label className="text-sm text-text-secondary mb-1 block">Nama Pengirim</label>
           <SearchableSelect options={pengirimList.map(p => p.nama)} value={form.nama_pengirim}
             onChange={(val) => setForm({ ...form, nama_pengirim: val })} placeholder="Pilih atau ketik nama pengirim baru" />
+        </div>
+        <div>
+          <label className="text-sm text-text-secondary mb-1 block">No Plat Mobil</label>
+          <input type="text" value={form.no_plat_mobil} onChange={(e) => setForm({ ...form, no_plat_mobil: e.target.value })}
+            className="w-full bg-surface-elevated border border-border rounded-xl px-4 py-3 text-text-primary" placeholder="Contoh: B 1234 ABC" />
         </div>
         <div>
           <label className="text-sm text-text-secondary mb-1 block">KG Masuk</label>
