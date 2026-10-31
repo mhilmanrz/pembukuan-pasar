@@ -72,7 +72,7 @@ const getById = async (req, res) => {
 // POST /api/barang-masuk
 const create = async (req, res) => {
   try {
-    const { tanggal, kg, nama_pengirim, harga, sudah_dibayar, gambar } = req.body;
+    const { tanggal, kg, nama_pengirim, harga, sudah_dibayar, gambar, no_plat_mobil } = req.body;
     if (!tanggal || !kg || !nama_pengirim || harga === undefined) {
       return res.status(400).json({ error: 'Semua field wajib diisi' });
     }
@@ -94,8 +94,8 @@ const create = async (req, res) => {
       }
 
       const result = await client.query(
-        'INSERT INTO barang_masuk (tanggal, kg, nama_pengirim, pengirim_id, harga, gambar) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [tanggal, kg, nama_pengirim, pengirimId, harga, gambar ? JSON.stringify(gambar) : '[]']
+        'INSERT INTO barang_masuk (tanggal, kg, nama_pengirim, pengirim_id, harga, gambar, no_plat_mobil) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+        [tanggal, kg, nama_pengirim, pengirimId, harga, gambar ? JSON.stringify(gambar) : '[]', no_plat_mobil || null]
       );
       const barangMasuk = result.rows[0];
 
@@ -134,7 +134,7 @@ const create = async (req, res) => {
 const update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { tanggal, kg, nama_pengirim, harga, gambar } = req.body;
+    const { tanggal, kg, nama_pengirim, harga, gambar, no_plat_mobil } = req.body;
     
     if (kg !== undefined && parseFloat(kg) <= 0) return res.status(400).json({ error: 'Kg harus lebih dari 0' });
     if (harga !== undefined && parseFloat(harga) < 0) return res.status(400).json({ error: 'Harga tidak boleh negatif' });
@@ -162,14 +162,15 @@ const update = async (req, res) => {
     }
 
     const result = await pool.query(
-      'UPDATE barang_masuk SET tanggal=COALESCE($1, tanggal), kg=COALESCE($2, kg), nama_pengirim=COALESCE($3, nama_pengirim), pengirim_id=$4, harga=COALESCE($5, harga), gambar=COALESCE($6, gambar) WHERE id=$7 RETURNING *',
+      'UPDATE barang_masuk SET tanggal=COALESCE($1, tanggal), kg=COALESCE($2, kg), nama_pengirim=COALESCE($3, nama_pengirim), pengirim_id=$4, harga=COALESCE($5, harga), gambar=COALESCE($6, gambar), no_plat_mobil=COALESCE($7, no_plat_mobil) WHERE id=$8 RETURNING *',
       [
         tanggal, 
         kg, 
         nama_pengirim, 
         pengirimId, 
         harga, 
-        gambar ? JSON.stringify(gambar) : null, 
+        gambar ? JSON.stringify(gambar) : null,
+        no_plat_mobil !== undefined ? no_plat_mobil : null,
         id
       ]
     );
